@@ -227,7 +227,7 @@ class LeekSignVM(
         const val UR_PCZT = "leek-pczt"
         const val UR_ZSIG = "leek-zsig"
         const val QR_MIN_FRAGMENT = 10
-        val QR_FRAGMENTS = listOf(50, 90, 150)
+        val QR_FRAGMENTS = listOf(50, 90, 150, 250)
         val QR_SPEEDS = listOf(300L, 500L, 800L)
     }
 }

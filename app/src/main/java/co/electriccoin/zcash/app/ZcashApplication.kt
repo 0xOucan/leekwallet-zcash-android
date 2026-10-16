@@ -15,6 +15,7 @@ import co.electriccoin.zcash.di.repositoryModule
 import co.electriccoin.zcash.di.useCaseModule
 import co.electriccoin.zcash.di.viewModelModule
 import co.electriccoin.zcash.ledger.di.featureLedgerModule
+import io.leekwallet.zcash.hw.featureLeekWalletModule
 import co.electriccoin.zcash.migration.di.featureMigrationModule
 import co.electriccoin.zcash.spackle.StrictModeCompat
 import co.electriccoin.zcash.spackle.Twig
@@ -85,7 +86,8 @@ class ZcashApplication : CoroutineApplication() {
                 viewModelModule,
                 featureMigrationModule,
                 featureVotingModule,
-                featureLedgerModule
+                featureLedgerModule,
+                featureLeekWalletModule
             )
         }
 

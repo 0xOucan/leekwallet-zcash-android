@@ -230,11 +230,24 @@ data class KeystoneAccount(
     override val transparentBalance: Zatoshi?,
     override val isSelected: Boolean,
 ) : HWWalletAccount {
+    /** A LeekWallet device's account: Keystone-shaped, signed over USB rather than by QR. */
+    val isLeekWallet: Boolean
+        get() =
+            sdkAccount.keySource?.lowercase() ==
+                co.electriccoin.zcash.ui.common.leekwallet.LEEKWALLET_KEY_SOURCE
+
     override val icon: Int
-        get() = R.drawable.ic_item_keystone
+        get() = if (isLeekWallet) R.drawable.ic_item_leekwallet else R.drawable.ic_item_keystone
 
     override val name: StringResource
-        get() = stringRes(co.electriccoin.zcash.ui.R.string.accounts_keystone)
+        get() =
+            stringRes(
+                if (isLeekWallet) {
+                    co.electriccoin.zcash.ui.R.string.accounts_leekwallet
+                } else {
+                    co.electriccoin.zcash.ui.R.string.accounts_keystone
+                }
+            )
 
     override val saplingAddress: String? = null
 

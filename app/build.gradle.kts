@@ -242,6 +242,7 @@ dependencies {
     implementation(projects.spackleAndroidLib)
     implementation(projects.uiLib)
     implementation(projects.featureLedger)
+    implementation(projects.featureLeekwallet)
     implementation(projects.featureMigration)
     implementation(projects.featureVoting)
 

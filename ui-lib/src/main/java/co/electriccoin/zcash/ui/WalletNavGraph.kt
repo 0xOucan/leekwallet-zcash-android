@@ -396,5 +396,9 @@ fun NavGraphBuilder.walletNavGraph(
         org.koin.mp.KoinPlatform.getKoin().getAll<LedgerNavContributor>().forEach {
             it.contribute(this)
         }
+        org.koin.mp.KoinPlatform
+            .getKoin()
+            .getAll<co.electriccoin.zcash.ui.common.leekwallet.LeekWalletNavContributor>()
+            .forEach { it.contribute(this) }
     }
 }

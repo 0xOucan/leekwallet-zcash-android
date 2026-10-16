@@ -80,6 +80,14 @@ interface AccountDataSource {
         birthday: BlockHeight? = null
     ): Account
 
+    /** Imports a LeekWallet device's account (watch-only; the device signs). */
+    suspend fun importLeekWalletAccount(
+        ufvk: String,
+        seedFingerprint: String,
+        index: Long,
+        birthday: BlockHeight?
+    ): Account
+
     /**
      * Imports the account a Ledger device just exported and persists its binding next to it, so a
      * later signing session knows which device and ZIP 32 account to sign with.
@@ -211,6 +219,31 @@ class AccountDataSourceImpl(
                 )
         }
 
+    @OptIn(ExperimentalStdlibApi::class)
+    override suspend fun importLeekWalletAccount(
+        ufvk: String,
+        seedFingerprint: String,
+        index: Long,
+        birthday: BlockHeight?
+    ): Account =
+        withContext(Dispatchers.IO) {
+            synchronizerProvider
+                .getSynchronizer()
+                .importAccountByUfvk(
+                    AccountImportSetup(
+                        accountName = context.getString(R.string.accounts_leekwallet),
+                        keySource = co.electriccoin.zcash.ui.common.leekwallet.LEEKWALLET_KEY_SOURCE,
+                        ufvk = UnifiedFullViewingKey(ufvk),
+                        purpose =
+                            AccountPurpose.Spending(
+                                seedFingerprint = seedFingerprint.hexToByteArray(),
+                                zip32AccountIndex = Zip32AccountIndex.new(index)
+                            ),
+                        birthday = birthday,
+                    ),
+                )
+        }
+
     /**
      * A Ledger account with no binding can never sign, so the import and the binding write are
      * all-or-nothing: if the binding cannot be stored, the just-imported account is deleted again
@@ -303,7 +336,11 @@ class AccountDataSourceImpl(
             }
         }
 
-    private fun isKeystoneAccount(sdkAccount: Account) = sdkAccount.keySource?.lowercase() == KEYSTONE_KEYSOURCE
+    /** Keystone-shaped accounts: Keystone itself, and a LeekWallet device (LeekWalletContracts.kt). */
+    private fun isKeystoneAccount(sdkAccount: Account) =
+        sdkAccount.keySource?.lowercase().let {
+            it == KEYSTONE_KEYSOURCE || it == co.electriccoin.zcash.ui.common.leekwallet.LEEKWALLET_KEY_SOURCE
+        }
 
     private fun isLedgerAccount(sdkAccount: Account) =
         sdkAccount.keySource?.lowercase() == Account.LEDGER_KEY_SOURCE

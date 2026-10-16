@@ -35,6 +35,7 @@ class SubmitProposalUseCase(
     private val keystoneProposalRepository: KeystoneProposalRepository,
     private val ledgerProposalPipeline: LedgerProposalPipeline,
     private val ledgerNavigator: LedgerNavigator,
+    private val leekWalletNavigator: co.electriccoin.zcash.ui.common.leekwallet.LeekWalletNavigator,
     private val biometricRepository: BiometricRepository,
     private val swapRepository: SwapRepository,
     private val metadataRepository: MetadataRepository,
@@ -77,7 +78,11 @@ class SubmitProposalUseCase(
             }
             when (account) {
                 is KeystoneAccount -> {
-                    navigationRouter.replace(SignKeystoneTransactionArgs)
+                    if (account.isLeekWallet) {
+                        leekWalletNavigator.forwardToSign()
+                    } else {
+                        navigationRouter.replace(SignKeystoneTransactionArgs)
+                    }
                 }
 
                 is LedgerAccount -> {

@@ -23,6 +23,7 @@ class ChooseHWWalletVM(
     getWalletAccounts: GetWalletAccountsUseCase,
     private val navigationRouter: NavigationRouter,
     private val ledgerNavigator: LedgerNavigator,
+    private val leekWalletNavigator: co.electriccoin.zcash.ui.common.leekwallet.LeekWalletNavigator,
 ) : ViewModel() {
     val state: StateFlow<ChooseHWWalletState> =
         getWalletAccounts
@@ -45,13 +46,23 @@ class ChooseHWWalletVM(
                         contentDescription = stringRes(R.string.accounts_keystone),
                         testTag = ChooseHWWalletTag.KEYSTONE_CARD,
                         onClick = ::onKeystoneClick,
-                    ).takeIf { accounts.orEmpty().none { account -> account is KeystoneAccount } },
+                    ).takeIf {
+                        accounts.orEmpty().none { account -> account is KeystoneAccount && !account.isLeekWallet }
+                    },
                     HWWalletCardState(
                         image = imageRes(R.drawable.img_hw_wallet_ledger),
                         contentDescription = stringRes(R.string.accounts_ledger),
                         testTag = ChooseHWWalletTag.LEDGER_CARD,
                         onClick = ::onLedgerClick,
                     ).takeIf { accounts.orEmpty().none { account -> account is LedgerAccount } },
+                    HWWalletCardState(
+                        image = imageRes(R.drawable.img_hw_wallet_leekwallet),
+                        contentDescription = stringRes(R.string.accounts_leekwallet),
+                        testTag = "LEEKWALLET_CARD",
+                        onClick = leekWalletNavigator::forwardToConnect,
+                    ).takeIf {
+                        accounts.orEmpty().none { account -> account is KeystoneAccount && account.isLeekWallet }
+                    },
                 ),
             onBack = ::onBack,
         )

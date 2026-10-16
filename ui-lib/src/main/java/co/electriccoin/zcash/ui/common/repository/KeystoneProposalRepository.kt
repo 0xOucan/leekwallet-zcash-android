@@ -99,6 +99,15 @@ interface KeystoneProposalRepository {
 
     suspend fun submit(): SubmitResult
 
+    /**
+     * The PCZT a USB signer signs (LeekWallet): the signer view of the proposal's PCZT, as
+     * [createPCZTEncoder] would hand Keystone.
+     */
+    suspend fun createSignerPczt(): Pczt
+
+    /** A signed PCZT from a USB signer, in place of [parsePCZT]'s scanned one. */
+    fun setPcztWithSignatures(pczt: Pczt)
+
     fun clear()
 
     suspend fun getTransactionProposal(): TransactionProposal
@@ -243,6 +252,17 @@ class KeystoneProposalRepositoryImpl(
                 throw IllegalStateException("Failed to generate PCZT encoder", e)
             }
         }
+
+    @Suppress("UseCheckOrError")
+    override suspend fun createSignerPczt(): Pczt =
+        withContext(Dispatchers.IO) {
+            val pczt = proposalPczt ?: throw IllegalStateException("Proposal not created")
+            proposalDataSource.redactPcztForSigner(pczt.clonePczt())
+        }
+
+    override fun setPcztWithSignatures(pczt: Pczt) {
+        pcztWithSignatures = pczt
+    }
 
     override suspend fun parsePCZT(ur: UR) =
         withContext(Dispatchers.IO) {

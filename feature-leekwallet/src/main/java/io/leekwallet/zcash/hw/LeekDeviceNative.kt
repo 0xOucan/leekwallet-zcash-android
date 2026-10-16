@@ -60,4 +60,17 @@ object PcztSignatures {
 
     /** @throws IllegalArgumentException when the .zsig is not for these bytes or a signature fails. */
     external fun apply(pczt: ByteArray, zsig: ByteArray): ByteArray
+
+    /**
+     * The compact signer view of [pczt] (v2 PCZT): about half the bytes, so half the QR frames.
+     * The device rebuilds the fields it leaves out. Keep [pczt] and sign it with [applyTo].
+     */
+    external fun compact(pczt: ByteArray): ByteArray
+
+    /**
+     * Applies a .zsig made for [sent] (e.g. [compact] of [pczt]) to [pczt].
+     * @throws IllegalArgumentException when the .zsig is not for [sent], [sent] is another
+     * transaction than [pczt], or a signature fails.
+     */
+    external fun applyTo(pczt: ByteArray, sent: ByteArray, zsig: ByteArray): ByteArray
 }

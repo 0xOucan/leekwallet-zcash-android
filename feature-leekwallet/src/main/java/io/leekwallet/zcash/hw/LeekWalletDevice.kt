@@ -73,6 +73,14 @@ class LeekWalletDevice(
         get() = runCatching { LeekTransport.valueOf(prefs.getString(KEY_TRANSPORT, null)!!) }.getOrDefault(LeekTransport.USB)
         set(value) = prefs.edit().putString(KEY_TRANSPORT, value.name).apply()
 
+    /** Send the device the compact signer view (half the bytes). Off = the full view, as before. */
+    var compactPczt: Boolean
+        get() = prefs.getBoolean(KEY_COMPACT, true)
+        set(value) = prefs.edit().putBoolean(KEY_COMPACT, value).apply()
+
+    /** What goes to the device for [pczt]: its compact view, or [pczt] itself. */
+    fun signerBytes(pczt: ByteArray): ByteArray = if (compactPczt) PcztSignatures.compact(pczt) else pczt
+
     val networkName: String
         get() = if (ZcashNetwork.fromResources(context) == ZcashNetwork.Testnet) "test" else "main"
 
@@ -90,16 +98,19 @@ class LeekWalletDevice(
         }
 
     /**
-     * Sends [pczt] (the signer view) to the device, waits for the user's review, and returns the
-     * PCZT with the device's signatures applied - what the SDK combines with the proven one.
+     * Sends [pczt] (the signer view, compacted if [compactPczt]) to the device, waits for the
+     * user's review, and returns [pczt] with the device's signatures applied - what the SDK
+     * combines with the proven one.
      */
-    suspend fun sign(pczt: ByteArray): ByteArray =
-        session { h ->
+    suspend fun sign(pczt: ByteArray): ByteArray {
+        val sent = signerBytes(pczt)
+        return session { h ->
             mutableStatus.value = LeekStatus.ReviewOnDevice
-            val zsig = LeekDeviceNative.sign(h, pczt, ACCOUNT, networkName)
+            val zsig = LeekDeviceNative.sign(h, sent, ACCOUNT, networkName)
             mutableStatus.value = LeekStatus.Working("Applying the signatures")
-            PcztSignatures.apply(pczt, zsig)
+            PcztSignatures.applyTo(pczt, sent, zsig)
         }
+    }
 
     fun reset() {
         mutableStatus.value = LeekStatus.Idle
@@ -170,6 +181,7 @@ class LeekWalletDevice(
     companion object {
         private const val ACCOUNT = 0
         private const val KEY_TRANSPORT = "transport"
+        private const val KEY_COMPACT = "compact_pczt"
         private const val ACTION_USB_PERMISSION = "io.leekwallet.zcash.USB_PERMISSION"
     }
 }

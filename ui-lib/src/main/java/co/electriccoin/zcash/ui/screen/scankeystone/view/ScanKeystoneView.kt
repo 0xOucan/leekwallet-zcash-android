@@ -1,5 +1,6 @@
 package co.electriccoin.zcash.ui.screen.scankeystone.view
 
+import co.electriccoin.zcash.ui.screen.scan.meterForQrCodes
 import android.Manifest
 import android.view.ViewGroup
 import androidx.camera.core.CameraControl
@@ -700,14 +701,16 @@ fun ScanCameraView(
                 runCatching {
                     // We must unbind the use-cases before rebinding them
                     collectedCameraProvider.unbindAll()
-                    cameraController.value =
+                    val camera =
                         collectedCameraProvider
                             .bindToLifecycle(
                                 lifecycleOwner,
                                 selector,
                                 preview,
                                 imageAnalysis
-                            ).cameraControl
+                            )
+                    camera.meterForQrCodes()
+                    cameraController.value = camera.cameraControl
                 }.onFailure {
                     Twig.error { "Scan QR failed in bind phase with: ${it.message}" }
                     setScanState(ScanScreenState.Failed)

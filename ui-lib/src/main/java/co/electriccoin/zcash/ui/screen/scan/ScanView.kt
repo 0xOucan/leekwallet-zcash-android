@@ -253,6 +253,8 @@ private fun ScanMainContent(
     var scanFrameLayoutSizeWindow by remember { mutableStateOf<IntSize?>(null) }
 
     val (isTorchOn, setIsTorchOn) = rememberSaveable { mutableStateOf(false) }
+    val scanContext = LocalContext.current
+    val (isScreenMode, setIsScreenMode) = remember { mutableStateOf(screenModePreference(scanContext)) }
 
     val convertImageUriToQrCode by remember { mutableStateOf(ImageUriToQrCodeConverter()) }
 
@@ -323,6 +325,7 @@ private fun ScanMainContent(
                     ScanCameraView(
                         framePosition = framePosition,
                         isTorchOn = isTorchOn,
+                        isScreenMode = isScreenMode,
                         onScan = onScan,
                         permissionState = permissionState,
                         setScanState = setScanState,
@@ -383,6 +386,21 @@ private fun ScanMainContent(
                         contentDescription = stringResource(id = R.string.scan_torch_content_description),
                         onClick = {
                             setIsTorchOn(!isTorchOn)
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    // Screen mode: a short exposure for a QR on a hardware wallet's OLED.
+                    ImageButton(
+                        painter =
+                            painterResource(
+                                if (isScreenMode) R.drawable.ic_scan_screen_on else R.drawable.ic_scan_screen_off
+                            ),
+                        contentDescription = "Screen mode",
+                        onClick = {
+                            saveScreenModePreference(scanContext, !isScreenMode)
+                            setIsScreenMode(!isScreenMode)
                         }
                     )
                 }
@@ -527,6 +545,7 @@ fun ScanFrame(modifier: Modifier = Modifier) {
 fun ScanCameraView(
     framePosition: FramePosition,
     isTorchOn: Boolean,
+    isScreenMode: Boolean,
     onScan: (result: String) -> Unit,
     permissionState: PermissionState,
     setScanState: (ScanScreenState) -> Unit,
@@ -549,6 +568,10 @@ fun ScanCameraView(
 
     val cameraController = remember { mutableStateOf<CameraControl?>(null) }
     cameraController.value?.enableTorch(isTorchOn)
+    val boundCamera = remember { mutableStateOf<androidx.camera.core.Camera?>(null) }
+    LaunchedEffect(boundCamera.value, isScreenMode) {
+        boundCamera.value?.applyScreenMode(isScreenMode)
+    }
 
     if (null == collectedCameraProvider) {
         // Show loading indicator
@@ -586,14 +609,17 @@ fun ScanCameraView(
                 runCatching {
                     // We must unbind the use-cases before rebinding them
                     collectedCameraProvider.unbindAll()
-                    cameraController.value =
+                    val camera =
                         collectedCameraProvider
                             .bindToLifecycle(
                                 lifecycleOwner,
                                 selector,
                                 preview,
                                 imageAnalysis
-                            ).cameraControl
+                            )
+                    camera.meterForQrCodes()
+                    boundCamera.value = camera
+                    cameraController.value = camera.cameraControl
                 }.onFailure {
                     Twig.error { "Scan QR failed in bind phase with: ${it.message}" }
                     setScanState(ScanScreenState.Failed)

@@ -37,6 +37,11 @@ data object LeekSignArgs
 data class LeekScreenState(
     val title: String,
     val status: LeekStatus,
+    val transport: LeekTransport = LeekTransport.USB,
+    val onTransport: (LeekTransport) -> Unit = {},
+    /** True until the first attempt starts: the user picks the link, then presses Start. */
+    val idle: Boolean = true,
+    val onStart: () -> Unit = {},
     val done: String? = null,
     val error: String? = null,
     val onRetry: (() -> Unit)? = null,
@@ -61,6 +66,26 @@ fun LeekSignScreen() {
 
 @Composable
 private fun LeekView(state: LeekScreenState) {
+    val blePermissions =
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            arrayOf(android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val permissionLauncher =
+        androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+        ) { granted -> if (granted.values.all { it }) state.onStart() }
+    val start = {
+        val missing =
+            state.transport == LeekTransport.BLUETOOTH &&
+                blePermissions.any {
+                    androidx.core.content.ContextCompat.checkSelfPermission(context, it) !=
+                        android.content.pm.PackageManager.PERMISSION_GRANTED
+                }
+        if (missing) permissionLauncher.launch(blePermissions) else state.onStart()
+    }
     BlankBgScaffold { padding ->
         Column(
             modifier = Modifier.fillMaxSize().scaffoldPadding(padding).padding(horizontal = 8.dp),
@@ -74,15 +99,39 @@ private fun LeekView(state: LeekScreenState) {
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
             )
+            Spacer(Modifier.height(16.dp))
+            androidx.compose.foundation.layout.Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                LeekTransport.entries.forEach { t ->
+                    ZashiButton(
+                        text = if (t == state.transport) "● ${t.label}" else t.label,
+                        enabled = state.idle || state.error != null,
+                        onClick = { state.onTransport(t) },
+                    )
+                }
+            }
             Spacer(Modifier.height(24.dp))
             when {
+                state.idle -> Message(
+                    if (state.transport == LeekTransport.BLUETOOTH) {
+                        "On the device: Settings > Link > Bluetooth. Then press Start."
+                    } else {
+                        "Connect the LeekWallet's USB port with a USB-OTG cable. Then press Start."
+                    },
+                    null
+                )
                 state.error != null -> Message(state.error, ZashiColors.Text.textError)
                 state.done != null -> Message(state.done, ZashiColors.Text.textPrimary)
                 else -> StatusView(state.status)
             }
             Spacer(Modifier.weight(1f))
-            state.onRetry?.takeIf { state.error != null }?.let {
-                ZashiButton(modifier = Modifier.fillMaxWidth(), text = "Try again", onClick = it)
+            if (state.idle || state.error != null) {
+                ZashiButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = if (state.idle) "Start" else "Try again",
+                    onClick = { start() }
+                )
                 Spacer(Modifier.height(8.dp))
             }
             ZashiButton(

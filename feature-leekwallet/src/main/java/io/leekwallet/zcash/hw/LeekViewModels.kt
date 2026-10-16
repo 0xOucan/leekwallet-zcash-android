@@ -31,19 +31,31 @@ class LeekConnectVM(
 ) : ViewModel() {
     private val mutableState =
         MutableStateFlow(
-            LeekScreenState(title = "Connect LeekWallet", status = LeekStatus.Idle, onRetry = ::start, onClose = ::close)
+            LeekScreenState(
+                title = "Connect LeekWallet",
+                status = LeekStatus.Idle,
+                transport = device.transport,
+                onTransport = ::setTransport,
+                onStart = ::start,
+                onRetry = ::start,
+                onClose = ::close
+            )
         )
     val state: StateFlow<LeekScreenState> = mutableState.asStateFlow()
     private var job: Job? = null
 
     init {
         viewModelScope.launch { device.status.collect { s -> mutableState.update { it.copy(status = s) } } }
-        start()
+    }
+
+    private fun setTransport(t: LeekTransport) {
+        device.transport = t
+        mutableState.update { it.copy(transport = t) }
     }
 
     private fun start() {
         job?.cancel()
-        mutableState.update { it.copy(error = null, done = null) }
+        mutableState.update { it.copy(error = null, done = null, idle = false) }
         job =
             viewModelScope.launch {
                 runCatching {
@@ -90,19 +102,31 @@ class LeekSignVM(
 ) : ViewModel() {
     private val mutableState =
         MutableStateFlow(
-            LeekScreenState(title = "Sign with LeekWallet", status = LeekStatus.Idle, onRetry = ::start, onClose = ::close)
+            LeekScreenState(
+                title = "Sign with LeekWallet",
+                status = LeekStatus.Idle,
+                transport = device.transport,
+                onTransport = ::setTransport,
+                onStart = ::start,
+                onRetry = ::start,
+                onClose = ::close
+            )
         )
     val state: StateFlow<LeekScreenState> = mutableState.asStateFlow()
     private var job: Job? = null
 
     init {
         viewModelScope.launch { device.status.collect { s -> mutableState.update { it.copy(status = s) } } }
-        start()
+    }
+
+    private fun setTransport(t: LeekTransport) {
+        device.transport = t
+        mutableState.update { it.copy(transport = t) }
     }
 
     private fun start() {
         job?.cancel()
-        mutableState.update { it.copy(error = null) }
+        mutableState.update { it.copy(error = null, idle = false) }
         job =
             viewModelScope.launch {
                 runCatching {

@@ -13,6 +13,9 @@ object LeekDeviceNative {
 
     external fun open(io: UsbIo): Long
 
+    /** The device over Bluetooth LE ([BleIo] carries whole frames). */
+    external fun openBle(io: BleIo): Long
+
     external fun close(handle: Long)
 
     /** The v2 handshake; [listener] gets the six digits the user compares with the device. */

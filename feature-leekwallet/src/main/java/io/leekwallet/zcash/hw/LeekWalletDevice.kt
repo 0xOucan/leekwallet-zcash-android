@@ -19,6 +19,12 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import kotlin.coroutines.resume
 
+/** How the phone reaches the board. */
+enum class LeekTransport(val label: String) {
+    USB("USB"),
+    BLUETOOTH("Bluetooth"),
+}
+
 /** What the LeekWallet screens tell the user while a device session runs. */
 sealed interface LeekStatus {
     data object Idle : LeekStatus
@@ -57,6 +63,13 @@ class LeekWalletDevice(
     private val mutableStatus = MutableStateFlow<LeekStatus>(LeekStatus.Idle)
     val status: StateFlow<LeekStatus> = mutableStatus.asStateFlow()
 
+    private val prefs = context.getSharedPreferences("leekwallet_device", Context.MODE_PRIVATE)
+
+    /** The link to use, remembered between sessions. */
+    var transport: LeekTransport
+        get() = runCatching { LeekTransport.valueOf(prefs.getString(KEY_TRANSPORT, null)!!) }.getOrDefault(LeekTransport.USB)
+        set(value) = prefs.edit().putString(KEY_TRANSPORT, value.name).apply()
+
     val networkName: String
         get() = if (ZcashNetwork.fromResources(context) == ZcashNetwork.Testnet) "test" else "main"
 
@@ -92,6 +105,11 @@ class LeekWalletDevice(
     private suspend fun <T> session(block: (Long) -> T): T =
         withContext(Dispatchers.IO) {
             mutableStatus.value = LeekStatus.Connecting
+            if (transport == LeekTransport.BLUETOOTH) {
+                LeekBleLink.scanAndConnect(context).use { link ->
+                    return@withContext run(LeekDeviceNative.openBle(link), block)
+                }
+            }
             val manager = context.getSystemService(UsbManager::class.java)
             val device =
                 manager.deviceList.values.firstOrNull(UsbSerialIo::isLeekWallet)
@@ -99,18 +117,23 @@ class LeekWalletDevice(
             if (!manager.hasPermission(device)) {
                 check(requestPermission(manager, device)) { "USB permission was not granted." }
             }
-            UsbSerialIo.open(manager, device).use { io ->
-                val handle = LeekDeviceNative.open(io)
-                try {
-                    LeekDeviceNative.pair(handle) { mutableStatus.value = LeekStatus.ComparePasskey(it) }
-                    mutableStatus.value = LeekStatus.Unlock
-                    LeekDeviceNative.ensureUnlocked(handle)
-                    block(handle)
-                } finally {
-                    LeekDeviceNative.close(handle)
-                }
-            }
+            UsbSerialIo.open(manager, device).use { io -> run(LeekDeviceNative.open(io), block) }
         }
+
+    /** Pair, wait for the PIN, run [block], close: the same on every link. */
+    private fun <T> run(
+        handle: Long,
+        block: (Long) -> T
+    ): T {
+        try {
+            LeekDeviceNative.pair(handle) { mutableStatus.value = LeekStatus.ComparePasskey(it) }
+            mutableStatus.value = LeekStatus.Unlock
+            LeekDeviceNative.ensureUnlocked(handle)
+            return block(handle)
+        } finally {
+            LeekDeviceNative.close(handle)
+        }
+    }
 
     private suspend fun requestPermission(
         manager: UsbManager,
@@ -143,6 +166,7 @@ class LeekWalletDevice(
 
     companion object {
         private const val ACCOUNT = 0
+        private const val KEY_TRANSPORT = "transport"
         private const val ACTION_USB_PERMISSION = "io.leekwallet.zcash.USB_PERMISSION"
     }
 }

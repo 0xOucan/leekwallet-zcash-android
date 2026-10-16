@@ -18,6 +18,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import co.electriccoin.zcash.ui.screen.scan.applyScreenMode
+import co.electriccoin.zcash.ui.screen.scan.meterForQrCodes
+import co.electriccoin.zcash.ui.screen.scan.screenModePreference
 import co.electriccoin.zcash.ui.screen.scan.util.QrCodeAnalyzerImpl
 import co.electriccoin.zcash.ui.screen.scankeystone.view.FramePosition
 
@@ -46,7 +49,11 @@ fun LeekQrScanner(onScanned: (String) -> Unit) {
                 QrCodeAnalyzerImpl(FramePosition(0f, 0f, 1f, 1f), onScanned)
             )
             p.unbindAll()
-            p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+            val camera = p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+            // The signature is on the board's OLED: meter on it, and use the wallet scanner's
+            // screen-mode choice (a short exposure) when the user turned it on there.
+            camera.meterForQrCodes()
+            camera.applyScreenMode(screenModePreference(context))
         }
         onDispose { provider?.unbindAll() }
     }

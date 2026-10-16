@@ -30,7 +30,7 @@ import co.electriccoin.zcash.spackle.Twig
  * fixed-focus tablet camera may need it. A camera without manual exposure gets exposure
  * compensation near the bottom of its range instead.
  */
-internal fun Camera.meterForQrCodes() {
+fun Camera.meterForQrCodes() {
     runCatching {
         val point = SurfaceOrientedMeteringPointFactory(1f, 1f).createPoint(0.5f, 0.5f, CENTRE_SIZE)
         cameraControl.startFocusAndMetering(
@@ -43,7 +43,7 @@ internal fun Camera.meterForQrCodes() {
 }
 
 @OptIn(ExperimentalCamera2Interop::class)
-internal fun Camera.applyScreenMode(on: Boolean) {
+fun Camera.applyScreenMode(on: Boolean) {
     runCatching {
         val c2 = Camera2CameraControl.from(cameraControl)
         val exposure = cameraInfo.exposureState
@@ -81,10 +81,10 @@ internal fun Camera.applyScreenMode(on: Boolean) {
 private const val PREFS = "leekwallet_scan"
 private const val KEY_SCREEN_MODE = "screen_mode"
 
-internal fun screenModePreference(context: Context): Boolean =
+fun screenModePreference(context: Context): Boolean =
     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_SCREEN_MODE, false)
 
-internal fun saveScreenModePreference(
+fun saveScreenModePreference(
     context: Context,
     on: Boolean
 ) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_SCREEN_MODE, on).apply()

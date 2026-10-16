@@ -45,6 +45,11 @@ data class LeekScreenState(
     val scanning: Boolean = false,
     val onScanned: (String) -> Unit = {},
     val onScanSignature: () -> Unit = {},
+    /** QR mode: bytes per fragment and milliseconds per frame, and steppers for them. */
+    val qrFragment: Int = 90,
+    val qrFrameMs: Long = 500,
+    val onQrFragment: () -> Unit = {},
+    val onQrSpeed: () -> Unit = {},
     val onTransport: (LeekTransport) -> Unit = {},
     /** True until the first attempt starts: the user picks the link, then presses Start. */
     val idle: Boolean = true,
@@ -93,6 +98,10 @@ private fun LeekView(state: LeekScreenState) {
                 }
         if (missing) permissionLauncher.launch(blePermissions) else state.onStart()
     }
+    if (state.qrPart != null && !state.scanning && state.error == null) {
+        LeekQrSendView(state)
+        return
+    }
     BlankBgScaffold { padding ->
         Column(
             modifier = Modifier.fillMaxSize().scaffoldPadding(padding).padding(horizontal = 8.dp),
@@ -124,20 +133,6 @@ private fun LeekView(state: LeekScreenState) {
                     Message("Point the camera at the signature QR on the device.", null)
                     Spacer(Modifier.height(16.dp))
                     LeekQrScanner(onScanned = state.onScanned)
-                }
-                state.qrPart != null && state.error == null -> {
-                    Message(
-                        "On the device: Scan, and point its camera here. After you accept on the device, " +
-                            "press Scan signature.",
-                        null
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    co.electriccoin.zcash.ui.design.component.ZashiQr(
-                        state = co.electriccoin.zcash.ui.design.component.QrState(qrData = state.qrPart),
-                        qrSize = 320.dp,
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    ZashiButton(text = "Scan signature", onClick = state.onScanSignature)
                 }
                 state.idle -> Message(
                     if (state.transport == LeekTransport.BLUETOOTH) {
@@ -209,4 +204,32 @@ private fun Message(
         color = color ?: ZashiColors.Text.textTertiary,
         textAlign = TextAlign.Center,
     )
+}
+
+
+/** QR mode, showing the PCZT: the code as large as the screen allows, and the few controls. */
+@Composable
+private fun LeekQrSendView(state: LeekScreenState) {
+    BlankBgScaffold { padding ->
+        Column(
+            modifier = Modifier.fillMaxSize().scaffoldPadding(padding),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = "On the device: Scan, and point its camera here. Accept on its last page, then Scan signature.",
+                style = ZashiTypography.textSm,
+                color = ZashiColors.Text.textTertiary,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(8.dp))
+            LeekBigQr(state.qrPart.orEmpty())
+            Spacer(Modifier.weight(1f))
+            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ZashiButton(text = "${state.qrFragment} B", onClick = state.onQrFragment)
+                ZashiButton(text = "${state.qrFrameMs} ms", onClick = state.onQrSpeed)
+                ZashiButton(text = "Scan signature", onClick = state.onScanSignature)
+                ZashiButton(text = "Cancel", onClick = state.onClose)
+            }
+        }
+    }
 }

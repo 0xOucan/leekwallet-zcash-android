@@ -109,6 +109,8 @@ class LeekSignVM(
                 transports = LeekTransport.entries,
                 onScanned = ::onScanned,
                 onScanSignature = ::onScanSignature,
+                onQrFragment = ::nextQrFragment,
+                onQrSpeed = ::nextQrSpeed,
                 onTransport = ::setTransport,
                 onStart = ::start,
                 onRetry = ::start,
@@ -163,12 +165,32 @@ class LeekSignVM(
     private suspend fun showOverQr(pczt: ByteArray) {
         qrPczt = pczt
         val ur = com.sparrowwallet.hummingbird.UR.fromBytes(UR_PCZT, pczt)
-        val encoder = com.sparrowwallet.hummingbird.UREncoder(ur, QR_FRAGMENT, QR_MIN_FRAGMENT, 0)
+        var fragment = 0
+        var encoder: com.sparrowwallet.hummingbird.UREncoder? = null
         while (!mutableState.value.scanning) {
+            // A new fragment size is a new encoder: the device's decoder starts over on it.
+            val wanted = mutableState.value.qrFragment
+            if (encoder == null || wanted != fragment) {
+                fragment = wanted
+                encoder = com.sparrowwallet.hummingbird.UREncoder(ur, fragment, QR_MIN_FRAGMENT, 0)
+            }
             // Upper case: QR alphanumeric mode, a third smaller; UR decoders, the device's
             // included, read it case-insensitively.
             mutableState.update { it.copy(qrPart = encoder.nextPart().uppercase()) }
-            kotlinx.coroutines.delay(QR_FRAME_MS)
+            kotlinx.coroutines.delay(mutableState.value.qrFrameMs)
+        }
+    }
+
+    /** As the LeekWallet companion offers them: smaller fragments are easier for the board. */
+    private fun nextQrFragment() {
+        mutableState.update { st: LeekScreenState ->
+            st.copy(qrFragment = QR_FRAGMENTS[(QR_FRAGMENTS.indexOf(st.qrFragment) + 1) % QR_FRAGMENTS.size])
+        }
+    }
+
+    private fun nextQrSpeed() {
+        mutableState.update { st: LeekScreenState ->
+            st.copy(qrFrameMs = QR_SPEEDS[(QR_SPEEDS.indexOf(st.qrFrameMs) + 1) % QR_SPEEDS.size])
         }
     }
 
@@ -204,8 +226,8 @@ class LeekSignVM(
     private companion object {
         const val UR_PCZT = "leek-pczt"
         const val UR_ZSIG = "leek-zsig"
-        const val QR_FRAGMENT = 90
         const val QR_MIN_FRAGMENT = 10
-        const val QR_FRAME_MS = 500L
+        val QR_FRAGMENTS = listOf(50, 90, 150)
+        val QR_SPEEDS = listOf(300L, 500L, 800L)
     }
 }

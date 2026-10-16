@@ -112,6 +112,8 @@ class LeekSignVM(
                 onQrFragment = ::nextQrFragment,
                 onQrSpeed = ::nextQrSpeed,
                 onTransport = ::setTransport,
+                compactPczt = device.compactPczt,
+                onCompactPczt = ::toggleCompact,
                 onStart = ::start,
                 onRetry = ::start,
                 onClose = ::close
@@ -129,6 +131,11 @@ class LeekSignVM(
         mutableState.update { it.copy(transport = t) }
     }
 
+    private fun toggleCompact() {
+        device.compactPczt = !device.compactPczt
+        mutableState.update { it.copy(compactPczt = device.compactPczt) }
+    }
+
     private fun start() {
         job?.cancel()
         mutableState.update { it.copy(error = null, idle = false, scanning = false, qrPart = null) }
@@ -137,7 +144,7 @@ class LeekSignVM(
                 runCatching {
                     val pczt = keystoneProposalRepository.createSignerPczt()
                     if (device.transport == LeekTransport.QR) {
-                        showOverQr(pczt.toByteArray())
+                        showOverQr(pczt.toByteArray(), device.signerBytes(pczt.toByteArray()))
                         return@launch
                     }
                     val signed = device.sign(pczt.toByteArray())
@@ -159,12 +166,14 @@ class LeekSignVM(
     // ---- QR air gap: ur:leek-pczt out, ur:leek-zsig back (FORMATS.md) ----
 
     private var qrPczt: ByteArray? = null
+    private var qrSent: ByteArray? = null
     private var decoder = com.sparrowwallet.hummingbird.URDecoder()
 
-    /** Animate the PCZT as ur:leek-pczt until the user moves on to scanning. */
-    private suspend fun showOverQr(pczt: ByteArray) {
+    /** Animate [sent] (the view of [pczt] for the device) as ur:leek-pczt until the user scans. */
+    private suspend fun showOverQr(pczt: ByteArray, sent: ByteArray) {
         qrPczt = pczt
-        val ur = com.sparrowwallet.hummingbird.UR.fromBytes(UR_PCZT, pczt)
+        qrSent = sent
+        val ur = com.sparrowwallet.hummingbird.UR.fromBytes(UR_PCZT, sent)
         var fragment = 0
         var encoder: com.sparrowwallet.hummingbird.UREncoder? = null
         while (!mutableState.value.scanning) {
@@ -208,7 +217,8 @@ class LeekSignVM(
             check(result.type == com.sparrowwallet.hummingbird.ResultType.SUCCESS) { "The QR could not be read" }
             check(result.ur.type == UR_ZSIG) { "Not a LeekWallet signature (ur:${result.ur.type})" }
             val pczt = checkNotNull(qrPczt) { "No transaction is waiting for a signature" }
-            val signed = PcztSignatures.apply(pczt, result.ur.toBytes())
+            val sent = checkNotNull(qrSent) { "No transaction is waiting for a signature" }
+            val signed = PcztSignatures.applyTo(pczt, sent, result.ur.toBytes())
             mutableState.update { it.copy(scanning = false, qrPart = null) }
             job =
                 viewModelScope.launch {

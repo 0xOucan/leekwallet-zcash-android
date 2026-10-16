@@ -51,6 +51,9 @@ data class LeekScreenState(
     val onQrFragment: () -> Unit = {},
     val onQrSpeed: () -> Unit = {},
     val onTransport: (LeekTransport) -> Unit = {},
+    /** Signing: whether the device gets the compact PCZT, and a toggle; null hides it. */
+    val compactPczt: Boolean? = null,
+    val onCompactPczt: () -> Unit = {},
     /** True until the first attempt starts: the user picks the link, then presses Start. */
     val idle: Boolean = true,
     val onStart: () -> Unit = {},
@@ -126,6 +129,14 @@ private fun LeekView(state: LeekScreenState) {
                         onClick = { state.onTransport(t) },
                     )
                 }
+            }
+            if (state.compactPczt != null) {
+                Spacer(Modifier.height(8.dp))
+                ZashiButton(
+                    text = if (state.compactPczt) "PCZT: compact" else "PCZT: full",
+                    enabled = state.idle || state.error != null,
+                    onClick = state.onCompactPczt,
+                )
             }
             Spacer(Modifier.height(24.dp))
             when {

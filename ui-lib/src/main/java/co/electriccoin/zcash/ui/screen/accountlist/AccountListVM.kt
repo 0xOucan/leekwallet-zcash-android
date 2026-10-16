@@ -40,7 +40,7 @@ class AccountListVM(
                                 subtitle = stringResByAddress(account.unifiedAddress),
                                 icon =
                                     when (account) {
-                                        is KeystoneAccount -> R.drawable.ic_item_keystone
+                                        is KeystoneAccount -> account.icon
                                         is LedgerAccount -> R.drawable.ic_item_ledger
                                         is ZashiAccount -> R.drawable.ic_item_zashi
                                     },

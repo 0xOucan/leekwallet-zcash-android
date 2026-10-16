@@ -89,6 +89,8 @@ class DisconnectVM(
             icon =
                 if (hwAccount is LedgerAccount) {
                     co.electriccoin.zcash.ui.design.R.drawable.ic_item_ledger
+                } else if (hwAccount is KeystoneAccount && hwAccount.isLeekWallet) {
+                    hwAccount.icon
                 } else {
                     co.electriccoin.zcash.ui.design.R.drawable.ic_item_keystone
                 },

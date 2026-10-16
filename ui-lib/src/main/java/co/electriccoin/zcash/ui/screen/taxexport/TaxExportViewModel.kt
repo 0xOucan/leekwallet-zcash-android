@@ -49,7 +49,7 @@ class TaxExportViewModel(
                 stringRes(
                     R.string.taxExport_desc,
                     when (selectedAccount) {
-                        is KeystoneAccount -> stringRes(R.string.accounts_keystone)
+                        is KeystoneAccount -> selectedAccount.name
                         is LedgerAccount -> stringRes(R.string.accounts_ledger)
                         else -> stringRes(R.string.accounts_zashi)
                     }

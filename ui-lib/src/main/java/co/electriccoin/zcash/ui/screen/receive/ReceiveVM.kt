@@ -85,12 +85,19 @@ class ReceiveVM(
     ) = ReceiveAddressState(
         icon =
             when (account) {
-                is KeystoneAccount -> co.electriccoin.zcash.ui.design.R.drawable.ic_item_keystone
+                is KeystoneAccount -> account.icon
                 is LedgerAccount -> co.electriccoin.zcash.ui.design.R.drawable.ic_item_ledger
                 is ZashiAccount -> R.drawable.ic_zec_round_full
             },
         title =
             when (account) {
+                is KeystoneAccount if account.isLeekWallet -> {
+                    if (type == Unified) {
+                        stringRes("LeekWallet Shielded Address")
+                    } else {
+                        stringRes("LeekWallet Transparent Address")
+                    }
+                }
                 is KeystoneAccount -> {
                     if (type == Unified) {
                         stringRes(R.string.accounts_keystone_shieldedAddress)

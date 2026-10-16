@@ -46,7 +46,7 @@ data class LeekScreenState(
     val onScanned: (String) -> Unit = {},
     val onScanSignature: () -> Unit = {},
     /** QR mode: bytes per fragment and milliseconds per frame, and steppers for them. */
-    val qrFragment: Int = 90,
+    val qrFragment: Int = 50,
     val qrFrameMs: Long = 500,
     val onQrFragment: () -> Unit = {},
     val onQrSpeed: () -> Unit = {},

@@ -6,6 +6,7 @@ import cash.z.ecc.sdk.ANDROID_STATE_FLOW_TIMEOUT
 import co.electriccoin.zcash.ui.NavigationRouter
 import co.electriccoin.zcash.ui.NavigationTargets
 import co.electriccoin.zcash.ui.R
+import co.electriccoin.zcash.ui.common.leekwallet.LeekWalletNavigator
 import co.electriccoin.zcash.ui.common.model.KeystoneAccount
 import co.electriccoin.zcash.ui.common.model.LedgerAccount
 import co.electriccoin.zcash.ui.common.model.WalletAccount
@@ -36,6 +37,7 @@ class ReceiveVM(
     private val copyToClipboard: CopyToClipboardUseCase,
     private val navigationRouter: NavigationRouter,
     private val navigateToRequestZec: NavigateToRequestZecUseCase,
+    private val leekWalletNavigator: LeekWalletNavigator,
 ) : ViewModel() {
     private val expandedIndex = MutableStateFlow(0)
 
@@ -131,6 +133,12 @@ class ReceiveVM(
         },
         onQrClicked = { onQrCodeClick(type) },
         onRequestClicked = { onRequestClick(type) },
+        onVerifyClicked =
+            if (account is KeystoneAccount && account.isLeekWallet && type == Unified) {
+                { leekWalletNavigator.forwardToVerifyAddress(address) }
+            } else {
+                null
+            },
         onClick = onClick,
         isExpanded = isExpanded,
         colorMode =

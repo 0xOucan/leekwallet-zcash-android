@@ -243,6 +243,7 @@ private fun AddressPanel(
         }
 
         AnimatedVisibility(visible = state.isExpanded) {
+            androidx.compose.foundation.layout.Column {
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier =
@@ -282,6 +283,20 @@ private fun AddressPanel(
                     text = stringResource(id = R.string.receive_request),
                     modifier = Modifier.weight(1f)
                 )
+            }
+            state.onVerifyClicked?.let { onVerify ->
+                ReceiveIconButton(
+                    containerColor = buttonColor,
+                    contentColor = buttonTextColor,
+                    iconPainter = painterResource(id = state.icon),
+                    onClick = onVerify,
+                    text = "Verify on device",
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = ZcashTheme.dimens.spacingSmall)
+                )
+            }
             }
         }
     }

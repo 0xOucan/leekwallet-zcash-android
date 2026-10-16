@@ -33,6 +33,10 @@ data object LeekConnectArgs
 @Serializable
 data object LeekSignArgs
 
+/** Verify on the device that [ua] is the device's own address. */
+@kotlinx.serialization.Serializable
+data class LeekVerifyArgs(val ua: String)
+
 /** What either screen shows: a title, the device status, an error, and the buttons that apply. */
 data class LeekScreenState(
     val title: String,
@@ -74,6 +78,14 @@ fun LeekConnectScreen() {
 @Composable
 fun LeekSignScreen() {
     val vm = koinViewModel<LeekSignVM>()
+    val state by vm.state.collectAsStateWithLifecycle()
+    BackHandler { state.onClose() }
+    LeekView(state)
+}
+
+@Composable
+fun LeekVerifyScreen(ua: String) {
+    val vm = koinViewModel<LeekVerifyVM> { org.koin.core.parameter.parametersOf(ua) }
     val state by vm.state.collectAsStateWithLifecycle()
     BackHandler { state.onClose() }
     LeekView(state)
@@ -192,8 +204,13 @@ private fun StatusView(status: LeekStatus) {
         LeekStatus.ReviewOnDevice ->
             Busy("Review the transaction on the device. Accept on its last page to sign.")
         is LeekStatus.Working -> Busy(status.what + "...")
-        LeekStatus.Connecting, LeekStatus.Idle ->
-            Busy("Connect the LeekWallet's USB port to this phone with a USB-OTG cable.")
+        LeekStatus.Connecting, LeekStatus.Idle -> Busy("Connecting to the LeekWallet...")
+        LeekStatus.CompareAddress ->
+            Message(
+                "The device shows its address. Check it against the one on this phone's Receive " +
+                    "screen, then confirm on the device.",
+                null
+            )
     }
 }
 

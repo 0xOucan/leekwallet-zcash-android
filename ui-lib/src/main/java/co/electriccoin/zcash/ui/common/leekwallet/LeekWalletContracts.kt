@@ -21,6 +21,9 @@ interface LeekWalletNavigator {
 
     /** Opens the LeekWallet sign sheet for the pending Keystone-pipeline proposal. */
     fun forwardToSign()
+
+    /** Asks the device to show its address, so the user checks [ua] against it there. */
+    fun forwardToVerifyAddress(ua: String)
 }
 
 /** Installs the LeekWallet destinations into the wallet nav graph. */

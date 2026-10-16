@@ -241,3 +241,58 @@ class LeekSignVM(
         val QR_SPEEDS = listOf(300L, 500L, 800L)
     }
 }
+
+/** Receive: the device shows its address, the user compares it with the app's ([ua]). */
+class LeekVerifyVM(
+    private val ua: String,
+    private val device: LeekWalletDevice,
+    private val navigationRouter: NavigationRouter,
+) : ViewModel() {
+    private val mutableState =
+        MutableStateFlow(
+            LeekScreenState(
+                title = "Verify address on LeekWallet",
+                status = LeekStatus.Idle,
+                transport = device.transport,
+                onTransport = ::setTransport,
+                onStart = ::start,
+                onRetry = ::start,
+                onClose = ::close
+            )
+        )
+    val state: StateFlow<LeekScreenState> = mutableState.asStateFlow()
+    private var job: Job? = null
+
+    init {
+        viewModelScope.launch { device.status.collect { s -> mutableState.update { it.copy(status = s) } } }
+    }
+
+    private fun setTransport(t: LeekTransport) {
+        device.transport = t
+        mutableState.update { it.copy(transport = t) }
+    }
+
+    private fun start() {
+        job?.cancel()
+        mutableState.update { it.copy(error = null, done = null, idle = false) }
+        job =
+            viewModelScope.launch {
+                runCatching { device.verifyAddress(ua) }
+                    .onSuccess {
+                        device.reset()
+                        mutableState.update {
+                            it.copy(done = "The device confirmed this address. It is your LeekWallet's.")
+                        }
+                    }.onFailure { e ->
+                        device.reset()
+                        mutableState.update { it.copy(error = e.message ?: e.toString()) }
+                    }
+            }
+    }
+
+    private fun close() {
+        job?.cancel()
+        device.reset()
+        navigationRouter.back()
+    }
+}

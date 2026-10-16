@@ -7,6 +7,7 @@ import co.electriccoin.zcash.ui.R
 import co.electriccoin.zcash.ui.common.component.destructive
 import co.electriccoin.zcash.ui.common.model.HWWalletAccount
 import co.electriccoin.zcash.ui.common.model.LceState
+import co.electriccoin.zcash.ui.common.model.KeystoneAccount
 import co.electriccoin.zcash.ui.common.model.LedgerAccount
 import co.electriccoin.zcash.ui.common.model.mutableLce
 import co.electriccoin.zcash.ui.common.model.stateIn

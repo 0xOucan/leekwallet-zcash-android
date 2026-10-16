@@ -1,94 +1,115 @@
-# Zodl Android Wallet
+# LeekWallet Zcash for Android
 
-This is the official home of the Zodl Zcash wallet for Android, a no-frills
-Zcash mobile wallet leveraging the [Zcash Android SDK](https://github.com/zcash/zcash-android-wallet-sdk).
+The Android companion for [LeekWallet Zcash](https://github.com/0xOucan/leekwallet-zcash),
+a DIY Zcash hardware wallet built on an ESP32-S3 board. It is a fork of
+[Zodl](https://github.com/zodl-inc/zodl-android), the Zcash wallet for Android:
+everything Zodl does, plus a LeekWallet account whose keys stay on the board.
 
-# Download
+The phone syncs, builds and proves transactions. The board holds the seed,
+checks each transaction against its own keys, shows you the outputs and memo,
+and signs. Only the signatures come back.
 
-[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
-     alt="Get it on F-Droid"
-     height="80">](https://foss.zodl.com)
-[<img src="https://play.google.com/intl/en_us/badges/images/generic/en-play-badge.png"
-     alt="Get it on Google Play"
-     height="80">](https://play.google.com/store/apps/details?id=co.electriccoin.zcash)
+> **Experimental.** Tested on testnet. The board is not audited and has no
+> flash encryption or secure boot (no eFuses burned). Do not use it with real
+> funds yet.
 
-Zodl runs its own F-Droid repository at <https://foss.zodl.com>. To add it to
-your F-Droid client, tap this link on Android:
+## What it adds to Zodl
 
+| | |
+|---|---|
+| **Connect a LeekWallet** | Pair over USB-OTG or Bluetooth LE; you compare a six-digit code on the phone and the board. The app imports the board's account as watch-only, with its birthday, and syncs it |
+| **Sign on the board** | Any send from the LeekWallet account goes to the board for review and signature, over **USB**, **Bluetooth**, or **QR** (animated `ur:leek-pczt` to the board's camera, `ur:leek-zsig` back) |
+| **Compact PCZT** | The board gets the compact signer view (~1.4 KB instead of ~2.8 KB): half the QR frames, faster links. A switch on the sign screen falls back to the full view |
+| **Verify on device** | On the Receive screen, the board checks that the address the phone shows, even a freshly rotated one, is its own, and shows it for you to compare. An address that is not the board's is refused, with a warning that the app may be compromised |
+| **Branding** | App name LeekWallet Zcash, package `io.leekwallet.zcash`, its own icons |
+
+Which link to use: **USB or Bluetooth** in a place you trust, for everyday
+use; they take seconds. **QR** keeps the board off every cable and radio but
+takes about 28 frames per send; use it when that isolation matters.
+
+## Using it with the board
+
+1. Flash and wire the board: see the main repository's
+   [README](https://github.com/0xOucan/leekwallet-zcash#readme) and
+   [wiring guide](https://github.com/0xOucan/leekwallet-zcash/blob/main/firmware/docs/WIRING-S3CAM.md).
+   Create or restore the wallet on the board, and unlock it with your PIN.
+2. In the app: add a hardware wallet → **LeekWallet**. Pick USB (OTG cable) or
+   Bluetooth (on the board: Settings → Link → Bluetooth), press Start, compare
+   the six digits, press ALLOW on the board.
+3. Send as usual from the LeekWallet account. On the sign screen pick the
+   link, press Start, review every page on the board and ACCEPT.
+4. Receive → LeekWallet Shielded Address → **Verify on device** to check the
+   address on the board's screen.
+
+## Build
+
+This repository is meant to sit inside the main one, as `android/`, because the
+native library is built from the main repository's `host/leek-android` crate.
+
+```sh
+git clone git@github.com:0xOucan/leekwallet-zcash.git
+cd leekwallet-zcash
+git clone -b leekwallet git@github.com:0xOucan/leekwallet-zcash-android.git android
+cd android
 ```
-fdroidrepos://foss.zodl.com/fdroid/repo?fingerprint=7e751ab710159dff44f55631f910ba4033f0ebd2f867691af633cece4ddb62e4
+
+You need what Zodl needs ([docs/Setup.md](docs/Setup.md): JDK, Android SDK),
+plus Rust with the `aarch64-linux-android` target and the Android NDK
+(27.2.12479018 by default, or set `ANDROID_NDK_HOME`).
+
+```sh
+rustup target add aarch64-linux-android
+tools/leekwallet/build-native.sh          # libleek_android.so for arm64-v8a
+
+./gradlew :app:assembleZcashtestnetFossDebug
+adb install -r app/build/outputs/apk/zcashtestnetFoss/debug/app-zcashtestnet-foss-debug.apk
 ```
 
-…or add the URL manually in **F-Droid → Settings → Repositories → +**:
-`https://foss.zodl.com/fdroid/repo` (fingerprint
-`7e751ab710159dff44f55631f910ba4033f0ebd2f867691af633cece4ddb62e4`).
+On a machine with little RAM, Gradle needs a lighter configuration:
 
-Unlike the `f-droid.org` build, our repo ships the same build-time
-integrations as the Google Play release (Flexa, CMC, Crashlytics) and is
-signed with the same upload key — no reinstall needed when switching.
+```sh
+./gradlew --no-daemon --no-parallel --max-workers=2 \
+  -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=1g" \
+  -Pkotlin.compiler.execution.strategy=in-process \
+  :app:assembleZcashtestnetFossDebug
+```
 
-Or download the latest APK from the [Releases Section](https://github.com/zodl-inc/zodl-android/releases/latest).
+## How the fork is organised
 
-# Zodl Support
+The LeekWallet code is kept apart so the fork stays easy to rebase and the
+hardware support can be offered to Zodl upstream.
 
-Obtain help for Zodl and connect with our team at [support.zodl.com](https://support.zodl.com/).
+| Where | What |
+|---|---|
+| `feature-leekwallet/` | The module: connect, sign and verify screens and view models, USB-OTG and Bluetooth LE links, QR (Hummingbird UR codes), the JNI bindings (`LeekDeviceNative`, `PcztSignatures`) |
+| `ui-lib/.../common/leekwallet/LeekWalletContracts.kt` | The seam between Zodl's UI and the module (navigator and nav-graph contributor, wired through Koin) |
+| `ui-lib` (small hooks) | A LeekWallet account is a Keystone-shaped account with key source `leekwallet`, so it uses Zodl's existing hardware-wallet proposal pipeline (`createSignerPczt` → board → signatures applied → submit). Hooks in the account type labels, choose-hardware-wallet, Receive, Request and the review screen |
+| `tools/leekwallet/` | Native library build, icon and logo generators |
+| `host/leek-android` (main repo) | The Rust side: device protocol (pairing, encrypted session, signing), compact view, applying the board's signatures with the `pczt` crate |
 
-# Reporting an issue
+Branches: `leekwallet` is the app (default branch); `main` mirrors Zodl's
+`main`; the remote `upstream` is
+[zodl-inc/zodl-android](https://github.com/zodl-inc/zodl-android), and
+`leekwallet` is rebased on each Zodl release.
 
-If you'd like to report a technical issue or feature request for the Android
-Wallet, please file a GitHub issue [here](https://github.com/zodl-inc/zodl-android/issues/new/choose).
+## Roadmap
 
-For feature requests and issues related to the Zodl user interface that are
-not Android-specific, please file a GitHub issue [here](https://github.com/zodl-inc/zodl-project/issues/new/choose).
+- [x] Import the board's account, sign over USB, Bluetooth and QR
+- [x] Compact PCZT; verify address on device (with rotating addresses)
+- [ ] NEAR Intents swaps signed on the board (needs mainnet support on the board)
+- [ ] A proper `LeekWalletAccount` type instead of the Keystone-shaped one
+- [ ] Offer the hardware module to Zodl upstream
+- [ ] Signed release APK
 
-If you wish to report a security issue, please follow our
-[Responsible Disclosure guidelines](https://github.com/zodl-inc/zodl-project/blob/master/responsible_disclosure.md).
-See the [Wallet App Threat Model](https://github.com/zodl-inc/zodl-project/blob/master/wallet_threat_model.md)
-for more information about the security and privacy limitations of the wallet.
+The full plan is in the main repository's
+[ROADMAP](https://github.com/0xOucan/leekwallet-zcash/blob/main/docs/zcash/ROADMAP.md).
 
-General Zcash questions and/or support requests and are best directed to either:
- * [Zcash Forum](https://forum.zcashcommunity.com/)
- * [Discord Community](https://discord.io/zcash-community)
+## Credits and license
 
-# Contributing
+Built on [Zodl](https://github.com/zodl-inc/zodl-android) by the Zcash Open
+Development Lab and the Zcash community; their original README is in
+[docs/ZODL-README.md](docs/ZODL-README.md). Please report LeekWallet issues
+here, not to Zodl.
 
-Contributions are very much welcomed!  Please read our 
-[Contributing Guidelines](docs/CONTRIBUTING.md) to learn about our process.
-
-# Getting Started
-
-If you'd like to compile this application from source, please see our 
-[Setup Documentation](docs/Setup.md) to get started.
-
-# Forking
-
-If you plan to fork the project to create a new app of your own, please make
-the following changes.  (If you're making a GitHub fork to contribute back to
-the project, these steps are not necessary.)
-
-1. Change the app name under [gradle.properties](gradle.properties)
-    1. See `ZCASH_RELEASE_APP_NAME`
-1. Change the package name under [app/build.gradle.kts](app/build.gradle.kts)
-    1. See `ZCASH_RELEASE_PACKAGE_NAME`
-1. Change the support email address under [strings.xml](ui-lib/src/main/res/ui/non_translatable/values/strings.xml)
-    1. See `support_email_address`
-1. Remove any copyrighted Zcash icons, logos, or assets
-    1. ui-lib/src/main/res/common/ - All of the the ic_launcher assets
-1. Optional
-    1. Configure secrets and variables for [Continuous Integration](docs/CI.md)
-    1. Configure Firebase API keys and place them under `app/src/debug/google-services.json` and `app/src/release/google-services.json`
-
-# Known Issues
-
-1. During builds, a warning will be printed that says "Unable to detect AGP
-   versions for included builds. All projects in the build should use the same
-   AGP version."  This can be safely ignored.  The version under
-   build-conventions is the same as the version used elsewhere in the
-   application.
-1. When the code coverage Gradle property
-   `IS_ANDROID_INSTRUMENTATION_TEST_COVERAGE_ENABLED` is enabled, the debug app
-   APK cannot be run.  The coverage flag should therefore only be set when
-   running automated tests.
-1. Test coverage for Compose code will be low, due to [known limitations](https://github.com/jacoco/jacoco/issues/1208) in the interaction between Compose and Jacoco.
-1. Adding the `espresso-contrib` dependency will cause builds to fail, due to conflicting classes.  This is a [known issue](https://github.com/zcash/zcash-android-wallet-sdk/issues/306) with the Zcash Android SDK.
-1. During app first launch, the following exception starting with `AndroidKeysetManager: keyset not found, will generate a new one` is printed twice.  This exception is not an error, and the code is not being invoked twice.
+MIT, as Zodl: see [LICENSE](LICENSE). The LeekWallet additions are by
+0xoucan under the same license.

@@ -113,7 +113,7 @@ class RequestVM(
                     RequestState.Memo(
                         icon =
                             when (account) {
-                                is KeystoneAccount -> co.electriccoin.zcash.ui.design.R.drawable.ic_item_keystone
+                                is KeystoneAccount -> account.icon
                                 is LedgerAccount -> co.electriccoin.zcash.ui.design.R.drawable.ic_item_ledger
                                 is ZashiAccount -> R.drawable.ic_zec_round_full
                             },

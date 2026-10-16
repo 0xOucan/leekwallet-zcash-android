@@ -195,7 +195,12 @@ class ReviewTransactionVM(
             ButtonState(
                 text =
                     when (selectedWallet) {
-                        is KeystoneAccount -> stringRes(R.string.keystone_confirm)
+                        is KeystoneAccount ->
+                            if (selectedWallet.isLeekWallet) {
+                                stringRes("Confirm with LeekWallet")
+                            } else {
+                                stringRes(R.string.keystone_confirm)
+                            }
                         is LedgerAccount -> stringRes(R.string.ledger_confirm)
                         is ZashiAccount -> stringRes(R.string.tabs_send)
                     },
@@ -268,7 +273,12 @@ class ReviewTransactionVM(
                 style = orchardPrivacyWarningButtonStyle(transactionProposal.proposal.usesOrchardInputs()),
                 text =
                     when (selectedWallet) {
-                        is KeystoneAccount -> stringRes(R.string.keystone_confirm)
+                        is KeystoneAccount ->
+                            if (selectedWallet.isLeekWallet) {
+                                stringRes("Confirm with LeekWallet")
+                            } else {
+                                stringRes(R.string.keystone_confirm)
+                            }
                         is LedgerAccount -> stringRes(R.string.ledger_confirm)
                         is ZashiAccount -> stringRes(R.string.tabs_send)
                     },

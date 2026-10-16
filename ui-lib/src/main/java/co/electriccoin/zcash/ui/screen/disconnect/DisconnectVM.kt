@@ -98,6 +98,8 @@ class DisconnectVM(
             connectedTitle =
                 if (hwAccount is LedgerAccount) {
                     stringRes(R.string.ledgerHW)
+                } else if (hwAccount is KeystoneAccount && hwAccount.isLeekWallet) {
+                    stringRes("LeekWallet")
                 } else {
                     stringRes(R.string.keystoneHW)
                 },

@@ -68,7 +68,12 @@ class ZashiTopAppBarVM(
                         onAccountTypeClick = ::onAccountTypeClicked,
                         accountType =
                             when (current) {
-                                is KeystoneAccount -> ZashiMainTopAppBarState.AccountType.KEYSTONE
+                                is KeystoneAccount ->
+                                    if (current.isLeekWallet) {
+                                        ZashiMainTopAppBarState.AccountType.LEEKWALLET
+                                    } else {
+                                        ZashiMainTopAppBarState.AccountType.KEYSTONE
+                                    }
                                 is LedgerAccount -> ZashiMainTopAppBarState.AccountType.LEDGER
                                 else -> ZashiMainTopAppBarState.AccountType.ZASHI
                             },

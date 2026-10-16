@@ -8,7 +8,7 @@ data class ZashiMainTopAppBarState(
     val balanceVisibilityButton: IconButtonState,
     val moreButton: IconButtonState
 ) {
-    enum class AccountType { ZASHI, KEYSTONE, LEDGER }
+    enum class AccountType { ZASHI, KEYSTONE, LEDGER, LEEKWALLET }
 }
 
 data class AccountSwitchState(

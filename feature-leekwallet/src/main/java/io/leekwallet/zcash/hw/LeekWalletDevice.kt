@@ -45,6 +45,9 @@ sealed interface LeekStatus {
 
     /** The transaction is on the device's screen: review it there. */
     data object ReviewOnDevice : LeekStatus
+
+    /** The device shows its address: compare it with the app's, answer on the device. */
+    data object CompareAddress : LeekStatus
 }
 
 /** The account a LeekWallet device exports (zGetAccount). */
@@ -111,6 +114,16 @@ class LeekWalletDevice(
             PcztSignatures.applyTo(pczt, sent, zsig)
         }
     }
+
+    /**
+     * zShowAddress: the device shows its address and the user confirms it there. Fails unless the
+     * device confirmed exactly [ua].
+     */
+    suspend fun verifyAddress(ua: String) =
+        session { h ->
+            mutableStatus.value = LeekStatus.CompareAddress
+            LeekDeviceNative.showAddress(h, ACCOUNT, networkName, ua)
+        }
 
     fun reset() {
         mutableStatus.value = LeekStatus.Idle

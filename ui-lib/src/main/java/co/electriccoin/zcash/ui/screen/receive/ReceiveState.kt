@@ -22,6 +22,8 @@ data class ReceiveAddressState(
     val onCopyClicked: () -> Unit,
     val onQrClicked: () -> Unit,
     val onRequestClicked: () -> Unit,
+    /** Hardware wallets that can show the address: verify it on the device. Null hides it. */
+    val onVerifyClicked: (() -> Unit)? = null,
 ) {
     enum class ColorMode {
         ZASHI,

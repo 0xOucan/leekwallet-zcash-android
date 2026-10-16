@@ -58,6 +58,8 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.annotation)
     implementation(libs.androidx.core)
+    implementation(libs.bundles.androidx.camera)
+    implementation(libs.keystone)
     implementation(libs.bundles.androidx.compose.core)
     implementation(libs.bundles.androidx.compose.extended)
     implementation(libs.kotlin.stdlib)

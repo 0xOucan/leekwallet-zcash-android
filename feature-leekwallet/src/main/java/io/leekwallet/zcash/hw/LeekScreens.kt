@@ -38,6 +38,13 @@ data class LeekScreenState(
     val title: String,
     val status: LeekStatus,
     val transport: LeekTransport = LeekTransport.USB,
+    val transports: List<LeekTransport> = listOf(LeekTransport.USB, LeekTransport.BLUETOOTH),
+    /** QR mode: the frame to show the device, or null. */
+    val qrPart: String? = null,
+    /** QR mode: true while the camera reads the device's signature QR. */
+    val scanning: Boolean = false,
+    val onScanned: (String) -> Unit = {},
+    val onScanSignature: () -> Unit = {},
     val onTransport: (LeekTransport) -> Unit = {},
     /** True until the first attempt starts: the user picks the link, then presses Start. */
     val idle: Boolean = true,
@@ -103,7 +110,7 @@ private fun LeekView(state: LeekScreenState) {
             androidx.compose.foundation.layout.Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                LeekTransport.entries.forEach { t ->
+                state.transports.forEach { t ->
                     ZashiButton(
                         text = if (t == state.transport) "● ${t.label}" else t.label,
                         enabled = state.idle || state.error != null,
@@ -113,6 +120,25 @@ private fun LeekView(state: LeekScreenState) {
             }
             Spacer(Modifier.height(24.dp))
             when {
+                state.scanning -> {
+                    Message("Point the camera at the signature QR on the device.", null)
+                    Spacer(Modifier.height(16.dp))
+                    LeekQrScanner(onScanned = state.onScanned)
+                }
+                state.qrPart != null && state.error == null -> {
+                    Message(
+                        "On the device: Scan, and point its camera here. After you accept on the device, " +
+                            "press Scan signature.",
+                        null
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    co.electriccoin.zcash.ui.design.component.ZashiQr(
+                        state = co.electriccoin.zcash.ui.design.component.QrState(qrData = state.qrPart),
+                        qrSize = 320.dp,
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    ZashiButton(text = "Scan signature", onClick = state.onScanSignature)
+                }
                 state.idle -> Message(
                     if (state.transport == LeekTransport.BLUETOOTH) {
                         "On the device: Settings > Link > Bluetooth. Then press Start."

@@ -23,6 +23,9 @@ import kotlin.coroutines.resume
 enum class LeekTransport(val label: String) {
     USB("USB"),
     BLUETOOTH("Bluetooth"),
+
+    /** Signing only: the PCZT and the signatures cross as QR codes, no link at all. */
+    QR("QR"),
 }
 
 /** What the LeekWallet screens tell the user while a device session runs. */

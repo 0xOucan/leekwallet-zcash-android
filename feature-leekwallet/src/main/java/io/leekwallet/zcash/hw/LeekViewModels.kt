@@ -61,8 +61,7 @@ class LeekConnectVM(
             viewModelScope.launch {
                 runCatching {
                     val info = device.readAccount()
-                    val birthday =
-                        info.birthday?.let { BlockHeight.new(it) }
+                    val birthday = usableBirthday(info.birthday)
                     val account =
                         accountDataSource.importLeekWalletAccount(
                             ufvk = info.ufvk,
@@ -81,6 +80,17 @@ class LeekConnectVM(
                     mutableState.update { it.copy(error = e.message ?: e.toString()) }
                 }
             }
+    }
+
+    /**
+     * The board keeps one birthday per account, whichever network it was recorded on. A height
+     * past this network's tip (a testnet birthday seen by the mainnet app: testnet is the
+     * longer chain) would hide every note, so it is dropped and the account scans from the start.
+     */
+    private suspend fun usableBirthday(height: Long?): BlockHeight? {
+        if (height == null) return null
+        val tip = synchronizerProvider.getSynchronizer().networkHeight.value
+        return if (tip != null && height > tip.value) null else BlockHeight.new(height)
     }
 
     private fun close() {

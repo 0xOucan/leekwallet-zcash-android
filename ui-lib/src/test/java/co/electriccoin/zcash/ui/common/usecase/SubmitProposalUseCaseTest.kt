@@ -187,7 +187,7 @@ class SubmitProposalUseCaseTest {
         }
 
     private fun Fixtures.givenKeystone(proposal: TransactionProposal) {
-        coEvery { accountDataSource.getSelectedAccount() } returns mockk<KeystoneAccount>()
+        coEvery { accountDataSource.getSelectedAccount() } returns mockk<KeystoneAccount> { every { isLeekWallet } returns false }
         coEvery { keystoneProposalRepository.getTransactionProposal() } returns proposal
     }
 
@@ -233,6 +233,7 @@ class SubmitProposalUseCaseTest {
                 keystoneProposalRepository = keystoneProposalRepository,
                 ledgerProposalPipeline = ledgerProposalPipeline,
                 ledgerNavigator = ledgerNavigator,
+                leekWalletNavigator = mockk(relaxed = true),
                 biometricRepository = biometricRepository,
                 swapRepository = swapRepository,
                 metadataRepository = metadataRepository,

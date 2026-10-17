@@ -29,7 +29,8 @@ import kotlin.test.assertEquals
 
 /**
  * The picker offers a vendor's card only while that vendor is unconnected, and each card routes to
- * that vendor's own connect flow.
+ * that vendor's own connect flow. The LeekWallet card (a Keystone-shaped account with its own key
+ * source) is offered beside them while no LeekWallet account exists.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChooseHWWalletVMTest {
@@ -50,7 +51,7 @@ class ChooseHWWalletVMTest {
         val vm = vm(accounts = emptyList())
 
         assertEquals(
-            listOf(ChooseHWWalletTag.KEYSTONE_CARD, ChooseHWWalletTag.LEDGER_CARD),
+            listOf(ChooseHWWalletTag.KEYSTONE_CARD, ChooseHWWalletTag.LEDGER_CARD, LEEKWALLET_CARD),
             vm.state.value.cards
                 .map { it.testTag }
         )
@@ -61,7 +62,7 @@ class ChooseHWWalletVMTest {
         val vm = vm(accounts = listOf(keystoneAccount()))
 
         assertEquals(
-            listOf(ChooseHWWalletTag.LEDGER_CARD),
+            listOf(ChooseHWWalletTag.LEDGER_CARD, LEEKWALLET_CARD),
             vm.state.value.cards
                 .map { it.testTag }
         )
@@ -72,17 +73,21 @@ class ChooseHWWalletVMTest {
         val vm = vm(accounts = listOf(ledgerAccount()))
 
         assertEquals(
-            listOf(ChooseHWWalletTag.KEYSTONE_CARD),
+            listOf(ChooseHWWalletTag.KEYSTONE_CARD, LEEKWALLET_CARD),
             vm.state.value.cards
                 .map { it.testTag }
         )
     }
 
     @Test
-    fun showsNoCardsOnceBothVendorsAreConnected() {
+    fun offersOnlyLeekWalletOnceKeystoneAndLedgerAreConnected() {
         val vm = vm(accounts = listOf(keystoneAccount(), ledgerAccount()))
 
-        assertEquals(emptyList(), vm.state.value.cards)
+        assertEquals(
+            listOf(LEEKWALLET_CARD),
+            vm.state.value.cards
+                .map { it.testTag }
+        )
     }
 
     @Test
@@ -92,11 +97,19 @@ class ChooseHWWalletVMTest {
         assertEquals(stringRes(R.string.chooseHWWallet_title), state.title)
         assertEquals(stringRes(R.string.chooseHWWallet_subtitle), state.subtitle)
         assertEquals(
-            listOf(imageRes(R.drawable.img_hw_wallet_keystone), imageRes(R.drawable.img_hw_wallet_ledger)),
+            listOf(
+                imageRes(R.drawable.img_hw_wallet_keystone),
+                imageRes(R.drawable.img_hw_wallet_ledger),
+                imageRes(R.drawable.img_hw_wallet_leekwallet)
+            ),
             state.cards.map { it.image }
         )
         assertEquals(
-            listOf(stringRes(R.string.accounts_keystone), stringRes(R.string.accounts_ledger)),
+            listOf(
+                stringRes(R.string.accounts_keystone),
+                stringRes(R.string.accounts_ledger),
+                stringRes(R.string.accounts_leekwallet)
+            ),
             state.cards.map { it.contentDescription }
         )
     }
@@ -131,7 +144,12 @@ class ChooseHWWalletVMTest {
             getWalletAccounts = getWalletAccounts,
             navigationRouter = navigationRouter,
             ledgerNavigator = ledgerNavigator,
+            leekWalletNavigator = mockk(relaxed = true),
         )
+    }
+
+    private companion object {
+        const val LEEKWALLET_CARD = "LEEKWALLET_CARD"
     }
 
     private fun keystoneAccount() =

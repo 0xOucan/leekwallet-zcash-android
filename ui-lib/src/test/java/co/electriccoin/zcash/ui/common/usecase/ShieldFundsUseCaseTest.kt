@@ -16,7 +16,6 @@ import co.electriccoin.zcash.ui.screen.error.ErrorArgs
 import co.electriccoin.zcash.ui.screen.error.NavigateToErrorUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.anyVararg
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify

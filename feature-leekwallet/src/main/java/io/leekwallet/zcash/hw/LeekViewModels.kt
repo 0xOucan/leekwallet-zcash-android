@@ -8,6 +8,7 @@ import cash.z.ecc.android.sdk.model.ZcashNetwork
 import cash.z.ecc.sdk.type.fromResources
 import co.electriccoin.zcash.ui.NavigationRouter
 import co.electriccoin.zcash.ui.common.datasource.AccountDataSource
+import co.electriccoin.zcash.ui.common.datasource.ShieldTransactionProposal
 import co.electriccoin.zcash.ui.common.provider.SynchronizerProvider
 import co.electriccoin.zcash.ui.common.repository.KeystoneProposalRepository
 import co.electriccoin.zcash.ui.common.usecase.SubmitKSProposalUseCase
@@ -157,9 +158,17 @@ class LeekSignVM(
             }
     }
 
+    /**
+     * Back to where the sign screen was opened from. A send goes back to its review screen, which
+     * still needs the proposal; a shield came from a prompt that builds a new one each time, so
+     * nothing would ever drop this one: drop it here (as Keystone's reject does).
+     */
     private fun close() {
         job?.cancel()
         device.reset()
+        if (keystoneProposalRepository.transactionProposal.value is ShieldTransactionProposal) {
+            keystoneProposalRepository.clear()
+        }
         navigationRouter.back()
     }
 

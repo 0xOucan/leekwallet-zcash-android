@@ -8,6 +8,7 @@ import cash.z.ecc.android.sdk.model.ZcashNetwork
 import cash.z.ecc.sdk.type.fromResources
 import co.electriccoin.zcash.ui.NavigationRouter
 import co.electriccoin.zcash.ui.common.datasource.AccountDataSource
+import co.electriccoin.zcash.ui.common.datasource.ShieldTransactionProposal
 import co.electriccoin.zcash.ui.common.provider.SynchronizerProvider
 import co.electriccoin.zcash.ui.common.repository.KeystoneProposalRepository
 import co.electriccoin.zcash.ui.common.usecase.SubmitKSProposalUseCase
@@ -60,8 +61,7 @@ class LeekConnectVM(
             viewModelScope.launch {
                 runCatching {
                     val info = device.readAccount()
-                    val birthday =
-                        info.birthday?.let { BlockHeight.new(it) }
+                    val birthday = usableBirthday(info.birthday)
                     val account =
                         accountDataSource.importLeekWalletAccount(
                             ufvk = info.ufvk,
@@ -80,6 +80,17 @@ class LeekConnectVM(
                     mutableState.update { it.copy(error = e.message ?: e.toString()) }
                 }
             }
+    }
+
+    /**
+     * The board keeps one birthday per account, whichever network it was recorded on. A height
+     * past this network's tip (a testnet birthday seen by the mainnet app: testnet is the
+     * longer chain) would hide every note, so it is dropped and the account scans from the start.
+     */
+    private suspend fun usableBirthday(height: Long?): BlockHeight? {
+        if (height == null) return null
+        val tip = synchronizerProvider.getSynchronizer().networkHeight.value
+        return if (tip != null && height > tip.value) null else BlockHeight.new(height)
     }
 
     private fun close() {
@@ -157,9 +168,17 @@ class LeekSignVM(
             }
     }
 
+    /**
+     * Back to where the sign screen was opened from. A send goes back to its review screen, which
+     * still needs the proposal; a shield came from a prompt that builds a new one each time, so
+     * nothing would ever drop this one: drop it here (as Keystone's reject does).
+     */
     private fun close() {
         job?.cancel()
         device.reset()
+        if (keystoneProposalRepository.transactionProposal.value is ShieldTransactionProposal) {
+            keystoneProposalRepository.clear()
+        }
         navigationRouter.back()
     }
 

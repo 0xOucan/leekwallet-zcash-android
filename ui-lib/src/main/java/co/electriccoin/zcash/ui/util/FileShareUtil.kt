@@ -16,22 +16,22 @@ object FileShareUtil {
     const val ZASHI_INTERNAL_DATA_MIME_TYPE = "application/octet-stream"
     const val ZASHI_QR_CODE_MIME_TYPE = "image/png"
 
-    const val ZASHI_INTERNAL_DATA_AUTHORITY = "co.electriccoin.zcash.provider"
-    const val ZASHI_INTERNAL_DATA_AUTHORITY_DEBUG = "co.electriccoin.zcash.debug.provider"
-    const val ZASHI_INTERNAL_DATA_AUTHORITY_INTERNAL = "co.electriccoin.zcash.internal.provider"
-    const val ZASHI_INTERNAL_DATA_AUTHORITY_INTERNAL_DEBUG = "co.electriccoin.zcash.internal.debug.provider"
+    const val ZASHI_INTERNAL_DATA_AUTHORITY = "io.leekwallet.zcash.provider"
+    const val ZASHI_INTERNAL_DATA_AUTHORITY_DEBUG = "io.leekwallet.zcash.debug.provider"
+    const val ZASHI_INTERNAL_DATA_AUTHORITY_INTERNAL = "io.leekwallet.zcash.internal.provider"
+    const val ZASHI_INTERNAL_DATA_AUTHORITY_INTERNAL_DEBUG = "io.leekwallet.zcash.internal.debug.provider"
 
-    const val ZASHI_INTERNAL_DATA_FOSS_AUTHORITY = "co.electriccoin.zcash.foss.provider"
-    const val ZASHI_INTERNAL_DATA_FOSS_AUTHORITY_DEBUG = "co.electriccoin.zcash.foss.debug.provider"
+    const val ZASHI_INTERNAL_DATA_FOSS_AUTHORITY = "io.leekwallet.zcash.foss.provider"
+    const val ZASHI_INTERNAL_DATA_FOSS_AUTHORITY_DEBUG = "io.leekwallet.zcash.foss.debug.provider"
 
-    const val ZASHI_INTERNAL_DATA_AUTHORITY_TESTNET = "co.electriccoin.zcash.provider.testnet"
-    const val ZASHI_INTERNAL_DATA_AUTHORITY_TESTNET_DEBUG = "co.electriccoin.zcash.debug.provider.testnet"
-    const val ZASHI_INTERNAL_DATA_AUTHORITY_TESTNET_INTERNAL = "co.electriccoin.zcash.internal.provider.testnet"
+    const val ZASHI_INTERNAL_DATA_AUTHORITY_TESTNET = "io.leekwallet.zcash.provider.testnet"
+    const val ZASHI_INTERNAL_DATA_AUTHORITY_TESTNET_DEBUG = "io.leekwallet.zcash.debug.provider.testnet"
+    const val ZASHI_INTERNAL_DATA_AUTHORITY_TESTNET_INTERNAL = "io.leekwallet.zcash.internal.provider.testnet"
     const val ZASHI_INTERNAL_DATA_AUTHORITY_TESTNET_INTERNAL_DEBUG =
-        "co.electriccoin.zcash.internal.debug.provider.testnet"
+        "io.leekwallet.zcash.internal.debug.provider.testnet"
 
-    const val ZASHI_INTERNAL_DATA_FOSS_AUTHORITY_TESTNET = "co.electriccoin.zcash.foss.provider.testnet"
-    const val ZASHI_INTERNAL_DATA_FOSS_AUTHORITY_TESTNET_DEBUG = "co.electriccoin.zcash.foss.debug.provider.testnet"
+    const val ZASHI_INTERNAL_DATA_FOSS_AUTHORITY_TESTNET = "io.leekwallet.zcash.foss.provider.testnet"
+    const val ZASHI_INTERNAL_DATA_FOSS_AUTHORITY_TESTNET_DEBUG = "io.leekwallet.zcash.foss.debug.provider.testnet"
 
     /**
      * Returns a new share internal app data intent with necessary permission granted exclusively to the data file.

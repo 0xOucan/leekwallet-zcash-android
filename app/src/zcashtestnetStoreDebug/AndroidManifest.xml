@@ -10,7 +10,7 @@
 
         <provider
             android:name="co.electriccoin.zcash.global.ShareFileProvider"
-            android:authorities="co.electriccoin.zcash.debug.provider.testnet"
+            android:authorities="io.leekwallet.zcash.debug.provider.testnet"
             android:exported="false"
             android:grantUriPermissions="true"
             tools:replace="android:authorities" >

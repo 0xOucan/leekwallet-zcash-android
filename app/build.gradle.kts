@@ -168,48 +168,13 @@ android {
         }
     }
 
-    // Resolve final app name
-    // Format: [BuildDistributionNetwork] - D=Debug/R=Release, S=Store/F=FOSS/I=Internal, M=Mainnet/T=Testnet
+    // Resolve final app name: the network is what tells the two installable apps apart
+    // ("LeekWallet Zcash" and "LeekWallet Zcash (testnet)"); the build type and distribution
+    // are in the package name and version name.
     applicationVariants.all {
         val defaultAppName = project.property("ZCASH_RELEASE_APP_NAME").toString()
-        when (this.name) {
-            "zcashtestnetStoreDebug" -> {
-                resValue("string", "app_name", "$defaultAppName [DST]")
-            }
-            "zcashmainnetStoreDebug" -> {
-                resValue("string", "app_name", "$defaultAppName [DSM]")
-            }
-            "zcashtestnetStoreRelease" -> {
-                resValue("string", "app_name", "$defaultAppName [RST]")
-            }
-            "zcashmainnetStoreRelease" -> {
-                resValue("string", "app_name", defaultAppName)
-            }
-            "zcashtestnetFossDebug" -> {
-                resValue("string", "app_name", "$defaultAppName [DFT]")
-            }
-            "zcashmainnetFossDebug" -> {
-                resValue("string", "app_name", "$defaultAppName [DFM]")
-            }
-            "zcashtestnetFossRelease" -> {
-                resValue("string", "app_name", "$defaultAppName [RFT]")
-            }
-            "zcashmainnetFossRelease" -> {
-                resValue("string", "app_name", defaultAppName)
-            }
-            "zcashmainnetInternalRelease" -> {
-                resValue("string", "app_name", "$defaultAppName [RIM]")
-            }
-            "zcashtestnetInternalRelease" -> {
-                resValue("string", "app_name", "$defaultAppName [RIT]")
-            }
-            "zcashmainnetInternalDebug" -> {
-                resValue("string", "app_name", "$defaultAppName [DIM]")
-            }
-            "zcashtestnetInternalDebug" -> {
-                resValue("string", "app_name", "$defaultAppName [DIT]")
-            }
-        }
+        val isTestnet = productFlavors.any { it.name == NetworkDimension.TESTNET.value }
+        resValue("string", "app_name", if (isTestnet) "$defaultAppName (testnet)" else defaultAppName)
     }
 
     dependenciesInfo {

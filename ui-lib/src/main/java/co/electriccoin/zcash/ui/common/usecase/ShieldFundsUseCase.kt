@@ -4,6 +4,7 @@ import co.electriccoin.zcash.ui.NavigationRouter
 import co.electriccoin.zcash.ui.common.datasource.AccountDataSource
 import co.electriccoin.zcash.ui.common.datasource.MessageAvailabilityDataSource
 import co.electriccoin.zcash.ui.common.ledger.LedgerNavigator
+import co.electriccoin.zcash.ui.common.leekwallet.LeekWalletNavigator
 import co.electriccoin.zcash.ui.common.ledger.LedgerProposalPipeline
 import co.electriccoin.zcash.ui.common.model.KeystoneAccount
 import co.electriccoin.zcash.ui.common.model.LedgerAccount
@@ -25,6 +26,7 @@ class ShieldFundsUseCase(
     private val keystoneProposalRepository: KeystoneProposalRepository,
     private val ledgerProposalPipeline: LedgerProposalPipeline,
     private val ledgerNavigator: LedgerNavigator,
+    private val leekWalletNavigator: LeekWalletNavigator,
     private val zashiProposalRepository: ZashiProposalRepository,
     private val navigationRouter: NavigationRouter,
     private val accountDataSource: AccountDataSource,
@@ -41,9 +43,9 @@ class ShieldFundsUseCase(
             scope.launch {
                 messageAvailabilityDataSource.onShieldingInitiated()
 
-                when (accountDataSource.getSelectedAccount()) {
+                when (val account = accountDataSource.getSelectedAccount()) {
                     is KeystoneAccount -> {
-                        createKeystoneShieldProposal()
+                        createKeystoneShieldProposal(isLeekWallet = account.isLeekWallet)
                     }
 
                     is LedgerAccount -> {
@@ -83,12 +85,20 @@ class ShieldFundsUseCase(
         }
     }
 
+    /**
+     * A LeekWallet account is Keystone-shaped: the same proposal and PCZT, but the board signs it
+     * (its transparent inputs included) on the LeekWallet sign screen instead of Keystone's QR one.
+     */
     @Suppress("TooGenericExceptionCaught")
-    private suspend fun createKeystoneShieldProposal() {
+    private suspend fun createKeystoneShieldProposal(isLeekWallet: Boolean) {
         try {
             keystoneProposalRepository.createShieldProposal()
             keystoneProposalRepository.createPCZTFromProposal()
-            navigationRouter.forward(SignKeystoneTransactionArgs)
+            if (isLeekWallet) {
+                leekWalletNavigator.forwardToSign()
+            } else {
+                navigationRouter.forward(SignKeystoneTransactionArgs)
+            }
         } catch (e: Exception) {
             keystoneProposalRepository.clear()
             navigateToError(ErrorArgs.ShieldingGeneralError(e))

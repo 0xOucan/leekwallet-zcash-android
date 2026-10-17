@@ -5,6 +5,8 @@ import co.electriccoin.zcash.ui.common.datasource.AccountDataSource
 import co.electriccoin.zcash.ui.common.datasource.MessageAvailabilityDataSource
 import co.electriccoin.zcash.ui.common.ledger.LedgerNavigator
 import co.electriccoin.zcash.ui.common.ledger.LedgerProposalPipeline
+import co.electriccoin.zcash.ui.common.leekwallet.LeekWalletNavigator
+import co.electriccoin.zcash.ui.common.model.KeystoneAccount
 import co.electriccoin.zcash.ui.common.model.LedgerAccount
 import co.electriccoin.zcash.ui.common.model.SubmitResult
 import co.electriccoin.zcash.ui.common.model.ZashiAccount
@@ -14,6 +16,7 @@ import co.electriccoin.zcash.ui.screen.error.ErrorArgs
 import co.electriccoin.zcash.ui.screen.error.NavigateToErrorUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.CancellationException
@@ -137,6 +140,44 @@ class ShieldFundsUseCaseTest {
             verify(exactly = 0) { ledgerNavigator.forwardToSign() }
         }
 
+    @Test
+    fun aLeekWalletAccountShieldsOnTheLeekWalletSignScreen() =
+        runTest(dispatcher) {
+            val keystoneProposalRepository = mockk<KeystoneProposalRepository>(relaxed = true)
+            val leekWalletNavigator = mockk<LeekWalletNavigator>(relaxed = true)
+            val navigationRouter = mockk<NavigationRouter>(relaxed = true)
+
+            keystoneUseCase(
+                leek = true,
+                keystoneProposalRepository = keystoneProposalRepository,
+                leekWalletNavigator = leekWalletNavigator,
+                navigationRouter = navigationRouter
+            )(false)
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { keystoneProposalRepository.createShieldProposal() }
+            coVerify(exactly = 1) { keystoneProposalRepository.createPCZTFromProposal() }
+            verify(exactly = 1) { leekWalletNavigator.forwardToSign() }
+            verify(exactly = 0) { navigationRouter.forward(*anyVararg()) }
+        }
+
+    @Test
+    fun aKeystoneAccountShieldsOnTheKeystoneSignScreen() =
+        runTest(dispatcher) {
+            val leekWalletNavigator = mockk<LeekWalletNavigator>(relaxed = true)
+            val navigationRouter = mockk<NavigationRouter>(relaxed = true)
+
+            keystoneUseCase(
+                leek = false,
+                leekWalletNavigator = leekWalletNavigator,
+                navigationRouter = navigationRouter
+            )(false)
+            advanceUntilIdle()
+
+            verify(exactly = 0) { leekWalletNavigator.forwardToSign() }
+            verify(exactly = 1) { navigationRouter.forward(*anyVararg()) }
+        }
+
     private fun useCase(
         submitResult: SubmitResult,
         navigateToError: NavigateToErrorUseCase
@@ -144,6 +185,7 @@ class ShieldFundsUseCaseTest {
         keystoneProposalRepository = mockk<KeystoneProposalRepository>(relaxed = true),
         ledgerProposalPipeline = mockk<LedgerProposalPipeline>(relaxed = true),
         ledgerNavigator = mockk<LedgerNavigator>(relaxed = true),
+        leekWalletNavigator = mockk<LeekWalletNavigator>(relaxed = true),
         zashiProposalRepository =
             mockk<ZashiProposalRepository>(relaxed = true) { coEvery { submit() } returns submitResult },
         navigationRouter = mockk<NavigationRouter>(relaxed = true),
@@ -161,11 +203,32 @@ class ShieldFundsUseCaseTest {
         keystoneProposalRepository = mockk<KeystoneProposalRepository>(relaxed = true),
         ledgerProposalPipeline = ledgerProposalPipeline,
         ledgerNavigator = ledgerNavigator,
+        leekWalletNavigator = mockk<LeekWalletNavigator>(relaxed = true),
         zashiProposalRepository = mockk<ZashiProposalRepository>(relaxed = true),
         navigationRouter = mockk<NavigationRouter>(relaxed = true),
         accountDataSource =
             mockk<AccountDataSource> { coEvery { getSelectedAccount() } returns mockk<LedgerAccount>() },
         navigateToError = navigateToError,
+        messageAvailabilityDataSource = mockk<MessageAvailabilityDataSource>(relaxed = true)
+    )
+
+    private fun keystoneUseCase(
+        leek: Boolean,
+        keystoneProposalRepository: KeystoneProposalRepository = mockk(relaxed = true),
+        leekWalletNavigator: LeekWalletNavigator = mockk(relaxed = true),
+        navigationRouter: NavigationRouter = mockk(relaxed = true),
+    ) = ShieldFundsUseCase(
+        keystoneProposalRepository = keystoneProposalRepository,
+        ledgerProposalPipeline = mockk<LedgerProposalPipeline>(relaxed = true),
+        ledgerNavigator = mockk<LedgerNavigator>(relaxed = true),
+        leekWalletNavigator = leekWalletNavigator,
+        zashiProposalRepository = mockk<ZashiProposalRepository>(relaxed = true),
+        navigationRouter = navigationRouter,
+        accountDataSource =
+            mockk<AccountDataSource> {
+                coEvery { getSelectedAccount() } returns mockk<KeystoneAccount> { every { isLeekWallet } returns leek }
+            },
+        navigateToError = mockk<NavigateToErrorUseCase>(relaxed = true),
         messageAvailabilityDataSource = mockk<MessageAvailabilityDataSource>(relaxed = true)
     )
 }

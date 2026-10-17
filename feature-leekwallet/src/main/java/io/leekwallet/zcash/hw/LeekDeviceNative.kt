@@ -30,8 +30,8 @@ object LeekDeviceNative {
      */
     external fun getAccount(handle: Long, account: Int, network: String): String
 
-    /** zSetAccountMeta; true when the device stored it in flash. */
-    external fun setBirthday(handle: Long, account: Int, birthday: Long): Boolean
+    /** zSetAccountMeta for [network] ("test"/"main"); true when the device stored it in flash. */
+    external fun setBirthday(handle: Long, account: Int, network: String, birthday: Long): Boolean
 
     /** zShowAddress: the user confirms on the device that [expectedUa] is the one it shows. */
     external fun showAddress(handle: Long, account: Int, network: String, expectedUa: String)

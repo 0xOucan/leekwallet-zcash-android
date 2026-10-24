@@ -145,7 +145,10 @@ android {
             isShrinkResources = project.property("IS_MINIFY_ENABLED").toString().toBoolean()
             ndk {
                 debugSymbolLevel = project.property("NDK_DEBUG_SYMBOL_LEVEL").toString()
-                abiFilters.addAll(setOf("arm64-v8a", "armeabi-v7a"))
+                // LeekWallet: libleek_android.so (the board link) is built for
+                // arm64-v8a only; a 32-bit phone would install the app and fail to
+                // load it, so release APKs are 64-bit only.
+                abiFilters.addAll(setOf("arm64-v8a"))
             }
 
             proguardFiles(

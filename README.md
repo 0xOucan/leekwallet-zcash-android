@@ -19,12 +19,13 @@ and signs. Only the signatures come back.
 | | |
 |---|---|
 | **Connect a LeekWallet** | Pair over USB-OTG or Bluetooth LE; you compare a six-digit code on the phone and the board. The app imports the board's account as watch-only, with its birthday, and syncs it |
-| **Sign on the board** | Any send from the LeekWallet account goes to the board for review and signature, over **USB**, **Bluetooth**, or **QR** (animated `ur:leek-pczt` to the board's camera, `ur:leek-zsig` back) |
+| **Sign on the board** | Any send from the LeekWallet account goes to the board for review and signature, over **USB**, **Bluetooth**, or **QR** (experimental, still in research: animated `ur:leek-pczt` to the board's camera, `ur:leek-zsig` back) |
 | **Compact PCZT** | The board gets the compact signer view (~1.4 KB instead of ~2.8 KB): half the QR frames, faster links. A switch on the sign screen falls back to the full view |
 | **Shield on the board** | Transparent funds of the LeekWallet account (its t-address) are shielded like any other send: Zodl's Shield prompt builds the proposal, the board reviews one "From k of n" page per transparent input and "Shield ... into this wallet", and signs the inputs (a version 2 `.zsig`) |
 | **Verify on device** | On the Receive screen, the board checks that the address the phone shows, even a freshly rotated one, is its own, and shows it for you to compare. An address that is not the board's is refused, with a warning that the app may be compromised |
-| **Mainnet and testnet** | Two apps that install side by side: **LeekWallet Zcash** (`io.leekwallet.zcash…`, mainnet) and **LeekWallet Zcash (testnet)** (`io.leekwallet.zcash.testnet…`). Each tells the board its network (`main` / `test`), and the board derives keys and addresses for it |
-| **Branding** | App name LeekWallet Zcash, package `io.leekwallet.zcash`, its own icons and file-provider authorities (so it installs next to Zodl) |
+| **Mainnet and testnet** | Two apps that install side by side: **LeekWallet Zcash** (`io.leekwallet.zcash.foss`, mainnet) and **LeekWallet Zcash (testnet)** (`io.leekwallet.zcash.testnet.foss`). Each tells the board its network (`main` / `test`), and the board derives keys and addresses for it |
+| **64-bit phones only** | Android 64-bit (arm64-v8a) phones. The board link's native library is built for arm64 only, so release APKs leave out 32-bit (armeabi-v7a) |
+| **Branding** | App name LeekWallet Zcash, package `io.leekwallet.zcash` (`.foss` in the released FOSS build), its own icons and file-provider authorities (so it installs next to Zodl) |
 
 Which link to use: **USB or Bluetooth** in a place you trust, for everyday
 use; they take seconds. **QR** keeps the board off every cable and radio but

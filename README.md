@@ -9,10 +9,14 @@ The phone syncs, builds and proves transactions. The board holds the seed,
 checks each transaction against its own keys, shows you the outputs and memo,
 and signs. Only the signatures come back.
 
-> **Experimental.** Tested on testnet; a mainnet build exists but has not
-> moved real funds yet. The board is not audited and has no
-> flash encryption or secure boot (no eFuses burned). Do not use it with real
-> funds yet.
+> **Experimental.** Tested on testnet, and on mainnet with small amounts (a
+> shielded send signed on the board). The board is not audited and has no
+> flash encryption or secure boot (no eFuses burned): use testnet, or small
+> amounts only.
+
+Website: [zcash.leekwallet.xyz](https://zcash.leekwallet.xyz) · X:
+[@gmLeekWallet](https://x.com/gmLeekWallet) ·
+[@0xOucan](https://x.com/0xOucan)
 
 ## What it adds to Zodl
 

@@ -75,8 +75,9 @@ apksigner verify --print-certs leekwallet-zcash-zodl-<version>-mainnet.apk
 `Signer #1 certificate SHA-256 digest` must be:
 
 ```
-TODO: placeholder until the first signed release. Do not install an APK
-      that claims to be a release while this line is a placeholder.
+c59491e663fbb200bee06d28098a7d1f8955d5cf3dcdcd9da20c9ed2ba658eb7
+(keytool: C5:94:91:E6:63:FB:B2:00:BE:E0:6D:28:09:8A:7D:1F:89:55:D5:CF:3D:CD:CD:9D:A2:0C:9E:D2:BA:65:8E:B7)
+Subject: CN=LeekWallet Zcash, O=LeekWallet, C=MX
 ```
 
 Both APKs are signed with the same certificate. On the phone, apps such as
@@ -164,7 +165,8 @@ far as you trust the source.
    and prints (does not run) the `ssh-keygen -Y sign`, `git tag` and
    `gh release create --draft` commands. Test both APKs with the board,
    then run those commands.
-4. On the first signed release, replace the placeholder fingerprint above.
+4. The script refuses an APK signed with any key but the one above
+   (`LEEK_CERT_SHA256` defaults to it).
 
 **Versions.** versionName is Zodl's version plus a LeekWallet counter, e.g.
 `3.17.0-leek.1`, `3.17.0-leek.2`, then `3.18.0-leek.1` after rebasing on

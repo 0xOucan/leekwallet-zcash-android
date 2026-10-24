@@ -1,0 +1,17 @@
+# The SSH key that signs SHA256SUMS of every release (LEEKWALLET-RELEASE.md).
+#
+# Verify a release with:
+#
+#   ssh-keygen -Y verify -f allowed_signers -I 0xoucanxxx@gmail.com \
+#       -n file -s SHA256SUMS.sig < SHA256SUMS
+#
+# Take this file from the git repository at the release's tag, not from the
+# release page: a file published next to the signature it vouches for proves
+# nothing. Compare the key with a second channel too before trusting it: it
+# is one of the maintainer's keys at https://github.com/0xOucan.keys.
+#
+# Rotating the key: the new key is added here in a commit, announced, and
+# noted in the changelog; the announcement of the new key is signed with the
+# old one. Releases already published stay verifiable with the line at their
+# own tag.
+0xoucanxxx@gmail.com namespaces="file" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAPljmoBLnjaqSUF/ThaMU5dcuolTHq4t3sG0991BZwF

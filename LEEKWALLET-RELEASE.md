@@ -24,8 +24,9 @@ versions and toolchain the APKs were built from).
 - Both apps install side by side, and next to Zodl itself: each has its own
   package name, storage and wallet. Nothing is shared between them.
 - The APKs are the FOSS build of Zodl (no Firebase, no Google ML Kit; QR
-  scanning uses zxing-cpp), for arm64 phones (the LeekWallet native library
-  is built for `arm64-v8a` only).
+  scanning uses zxing-cpp), for **64-bit (arm64) phones only**: the
+  LeekWallet native library is built for `arm64-v8a` only, so the APKs
+  contain no 32-bit code and do not install on 32-bit phones.
 
 ## Prebuilt APKs are a trust decision
 

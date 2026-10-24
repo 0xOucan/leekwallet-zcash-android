@@ -18,7 +18,8 @@
 # Optional:
 #   LEEK_VERSION_CODE   versionCode (default: commit count of HEAD, Zodl's rule)
 #   LEEK_DISTRIBUTION   foss (default: no Firebase, no ML Kit) or store
-#   LEEK_CERT_SHA256    expected signing certificate SHA-256; abort on mismatch
+#   LEEK_CERT_SHA256    expected signing certificate SHA-256 (default: the
+#                       project release key); abort on mismatch
 #   LEEK_HOST_DIR       the main repo's host/ (default: ../host)
 #   LEEK_SKIP_NATIVE=1  keep the libleek_android.so already in jniLibs
 #   LEEK_ALLOW_SNAPSHOT=1  build even though a dependency is a -SNAPSHOT
@@ -174,6 +175,7 @@ done
 
 if [[ "${LEEK_UNSIGNED:-}" != 1 ]]; then
   [[ "${CERTS[0]}" == "${CERTS[1]}" ]] || die "the two APKs are signed by different certificates"
+  LEEK_CERT_SHA256="${LEEK_CERT_SHA256:-c59491e663fbb200bee06d28098a7d1f8955d5cf3dcdcd9da20c9ed2ba658eb7}"  # the release key (LEEKWALLET-RELEASE.md)
   if [[ -n "${LEEK_CERT_SHA256:-}" ]]; then
     want="$(tr -d ': ' <<<"${LEEK_CERT_SHA256,,}")"
     [[ "${CERTS[0]}" == "$want" ]] || die "certificate ${CERTS[0]} is not LEEK_CERT_SHA256 $want"

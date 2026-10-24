@@ -13,17 +13,21 @@
 
 name: Deploy
 
+# LeekWallet fork: upstream Zodl's automatic triggers are commented out.
+# This workflow needs Zodl's secrets and infrastructure, and running it here
+# would only spend this fork's Actions minutes and artifact storage. It can
+# still be started by hand (workflow_dispatch). See LEEKWALLET-RELEASE.md.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - 'release/**'
-    paths-ignore:
-      - '.github/ISSUE_TEMPLATE/*'
-      - '.github/PULL_REQUEST_TEMPLATE.md'
-      - 'LICENSE'
-      - 'README.md'
-      - 'docs/**'
+# push:
+#   branches:
+#     - 'release/**'
+#   paths-ignore:
+#     - '.github/ISSUE_TEMPLATE/*'
+#     - '.github/PULL_REQUEST_TEMPLATE.md'
+#     - 'LICENSE'
+#     - 'README.md'
+#     - 'docs/**'
 
 concurrency: deploy
 

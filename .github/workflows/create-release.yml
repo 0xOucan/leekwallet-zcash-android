@@ -55,10 +55,14 @@ name: Create Release from tag
 # is unset, the workflow falls back to GITHUB_TOKEN and an operator must
 # (re)publish the release manually to kick off release.yaml.
 
+# LeekWallet fork: upstream Zodl's automatic triggers are commented out.
+# This workflow needs Zodl's secrets and infrastructure, and running it here
+# would only spend this fork's Actions minutes and artifact storage. It can
+# still be started by hand (workflow_dispatch). See LEEKWALLET-RELEASE.md.
 on:
-  push:
-    tags:
-      - '[0-9]+.[0-9]+.[0-9]+-[0-9]+'
+# push:
+#   tags:
+#     - '[0-9]+.[0-9]+.[0-9]+-[0-9]+'
   workflow_dispatch:
     inputs:
       tag:

@@ -25,15 +25,19 @@
 # what carries the cascade on to its next link once a human approves one.
 name: Cascade merge
 
+# LeekWallet fork: upstream Zodl's automatic triggers are commented out.
+# This workflow needs Zodl's secrets and infrastructure, and running it here
+# would only spend this fork's Actions minutes and artifact storage. It can
+# still be started by hand (workflow_dispatch). See LEEKWALLET-RELEASE.md.
 on:
-  push:
-    branches:
-      - 'maint/**'
-      - 'release/**'
-    tags:
-      - '[0-9]+.[0-9]+.[0-9]+-[0-9]+' # a release tag lands before the next cron tick would catch it
-  schedule:
-    - cron: '17,47 * * * *' # every 30 min, offset off the top of the hour
+# push:
+#   branches:
+#     - 'maint/**'
+#     - 'release/**'
+#   tags:
+#     - '[0-9]+.[0-9]+.[0-9]+-[0-9]+' # a release tag lands before the next cron tick would catch it
+# schedule:
+#   - cron: '17,47 * * * *' # every 30 min, offset off the top of the hour
   workflow_dispatch: {}
 
 concurrency:

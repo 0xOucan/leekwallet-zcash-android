@@ -25,9 +25,13 @@ name: Linear release tracking
 # Requires the LINEAR_ACCESS_KEY repo secret, generated against the Android
 # pipeline in Linear's UI.
 
+# LeekWallet fork: upstream Zodl's automatic triggers are commented out.
+# This workflow needs Zodl's secrets and infrastructure, and running it here
+# would only spend this fork's Actions minutes and artifact storage. It can
+# still be started by hand (workflow_dispatch). See LEEKWALLET-RELEASE.md.
 on:
-  release:
-    types: [published]
+# release:
+#   types: [published]
   workflow_dispatch:
     inputs:
       tag:

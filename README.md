@@ -57,6 +57,14 @@ per network. When the board's stored birthday belongs to the other network's
 chain (a testnet birthday is past mainnet's tip), the mainnet app ignores it
 and scans the account from the start.
 
+## Releases
+
+Signed APKs of both apps (mainnet and testnet) are on the
+[releases page](https://github.com/0xOucan/leekwallet-zcash-android/releases).
+[LEEKWALLET-RELEASE.md](LEEKWALLET-RELEASE.md) says how to verify them
+(checksums, SSH signature, signing certificate) and how to rebuild them.
+Building it yourself, below, is still the safer way to get a wallet.
+
 ## Build
 
 This repository is meant to sit inside the main one, as `android/`, because the

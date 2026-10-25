@@ -14,4 +14,4 @@
 # noted in the changelog; the announcement of the new key is signed with the
 # old one. Releases already published stay verifiable with the line at their
 # own tag.
-0xoucanxxx@gmail.com namespaces="file" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAPljmoBLnjaqSUF/ThaMU5dcuolTHq4t3sG0991BZwF
+0xoucanxxx@gmail.com namespaces="file,git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAPljmoBLnjaqSUF/ThaMU5dcuolTHq4t3sG0991BZwF

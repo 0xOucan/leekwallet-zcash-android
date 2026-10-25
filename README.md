@@ -14,7 +14,8 @@ and signs. Only the signatures come back.
 > flash encryption or secure boot (no eFuses burned): use testnet, or small
 > amounts only.
 
-Website: [zcash.leekwallet.xyz](https://zcash.leekwallet.xyz) · X:
+Website: [zcash.leekwallet.xyz](https://zcash.leekwallet.xyz) · Demo:
+[2-minute video](https://www.youtube.com/watch?v=8F6_8AhsnAA) · X:
 [@gmLeekWallet](https://x.com/gmLeekWallet) ·
 [@0xOucan](https://x.com/0xOucan)
 

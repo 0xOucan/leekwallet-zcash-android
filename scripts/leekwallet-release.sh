@@ -60,6 +60,7 @@ APKSIGNER="$(ls -d "$SDK_DIR"/build-tools/*/apksigner 2>/dev/null | sort -V | ta
 [[ -x "$APKSIGNER" ]] || APKSIGNER="$(command -v apksigner || true)"
 [[ -n "$APKSIGNER" ]] || die "apksigner not found (Android SDK build-tools)"
 AAPT2="$(ls -d "$SDK_DIR"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -n 1 || true)"
+ZIPALIGN="$(ls -d "$SDK_DIR"/build-tools/*/zipalign 2>/dev/null | sort -V | tail -n 1 || true)"
 for t in git java sha256sum unzip; do
   command -v "$t" >/dev/null || die "$t not found"
 done
@@ -104,11 +105,19 @@ elif [[ -n "${LEEK_RELEASE_KEYSTORE:-}" ]]; then
     read -r -s -p "Key password (Enter = same): " LEEK_RELEASE_KEY_PASSWORD; echo
     LEEK_RELEASE_KEY_PASSWORD="${LEEK_RELEASE_KEY_PASSWORD:-$LEEK_RELEASE_KEYSTORE_PASSWORD}"
   fi
-  # Environment, not -P, so the passwords stay out of the process list.
-  export ORG_GRADLE_PROJECT_ZCASH_RELEASE_KEYSTORE_PATH="$KS"
-  export ORG_GRADLE_PROJECT_ZCASH_RELEASE_KEY_ALIAS="$LEEK_RELEASE_KEY_ALIAS"
-  export ORG_GRADLE_PROJECT_ZCASH_RELEASE_KEYSTORE_PASSWORD="$LEEK_RELEASE_KEYSTORE_PASSWORD"
-  export ORG_GRADLE_PROJECT_ZCASH_RELEASE_KEY_ALIAS_PASSWORD="$LEEK_RELEASE_KEY_PASSWORD"
+  # Environment, not arguments, so the passwords stay out of the process list.
+  export LEEK_RELEASE_KEYSTORE_PASSWORD LEEK_RELEASE_KEY_PASSWORD
+  # Check the key now: a typo found after a 15-minute build costs the build.
+  command -v keytool >/dev/null || die "keytool not found (JDK)"
+  keytool -list -keystore "$KS" -alias "$LEEK_RELEASE_KEY_ALIAS" \
+    -storepass:env LEEK_RELEASE_KEYSTORE_PASSWORD >/dev/null 2>&1 ||
+    die "cannot open alias $LEEK_RELEASE_KEY_ALIAS in $KS (wrong password or alias?)"
+  [[ -x "$ZIPALIGN" ]] || die "zipalign not found (Android SDK build-tools)"
+  # Gradle builds unsigned and apksigner signs after, as app/scripts/android-release.sh
+  # in the main repository does: Gradle's signing step failed on the PKCS12
+  # release key without saying why, and this keeps the passwords out of Gradle.
+  APKSIGN=1
+  GRADLE_SIGN_ARGS=(-PZCASH_RELEASE_KEYSTORE_PATH=)
 elif grep -qs '^ZCASH_RELEASE_KEYSTORE_PATH=.\+' "$USER_PROPS"; then
   echo "signing with ZCASH_RELEASE_* from $USER_PROPS"
 else
@@ -157,9 +166,19 @@ for net in mainnet testnet; do
   [[ ${#apks[@]} -eq 1 ]] || die "expected one APK in $dir, found ${#apks[@]}"
   name="leekwallet-zcash-zodl-${VERSION_NAME}-${net}.apk"
   [[ "${LEEK_UNSIGNED:-}" == 1 ]] && name="${name%.apk}-unsigned.apk"
-  cp "${apks[0]}" "$OUT/$name"
+  if [[ "${APKSIGN:-}" == 1 ]]; then
+    "$ZIPALIGN" -f -p 4 "${apks[0]}" "$OUT/.aligned.apk"
+    "$APKSIGNER" sign --ks "$KS" --ks-key-alias "$LEEK_RELEASE_KEY_ALIAS" \
+      --ks-pass env:LEEK_RELEASE_KEYSTORE_PASSWORD --key-pass env:LEEK_RELEASE_KEY_PASSWORD \
+      --out "$OUT/$name" "$OUT/.aligned.apk"
+    rm -f "$OUT/.aligned.apk" "$OUT/$name.idsig"
+  else
+    cp "${apks[0]}" "$OUT/$name"
+  fi
 
-  unzip -l "$OUT/$name" | grep -q "lib/arm64-v8a/libleek_android.so" ||
+  # No `grep -q` here: it exits at the first match, unzip then dies of SIGPIPE,
+  # and pipefail turns a library that is there into a missing one.
+  unzip -Z1 "$OUT/$name" | grep -x "lib/arm64-v8a/libleek_android.so" >/dev/null ||
     die "$name has no libleek_android.so"
   if [[ -n "$AAPT2" ]]; then
     PKG[$net]="$("$AAPT2" dump packagename "$OUT/$name")"

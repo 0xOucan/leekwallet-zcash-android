@@ -9,7 +9,8 @@
 #   LEEK_RELEASE_KEYSTORE           path to the release keystore, outside the repo
 #   LEEK_RELEASE_KEY_ALIAS          key alias inside it
 #   LEEK_RELEASE_KEYSTORE_PASSWORD  asked for if unset
-#   LEEK_RELEASE_KEY_PASSWORD       asked for if unset (Enter = keystore password)
+#   LEEK_RELEASE_KEY_PASSWORD       default: the keystore password (a PKCS12 key
+#                                   has no password of its own)
 # or put Zodl's ZCASH_RELEASE_KEYSTORE_PATH, ZCASH_RELEASE_KEYSTORE_PASSWORD,
 # ZCASH_RELEASE_KEY_ALIAS and ZCASH_RELEASE_KEY_ALIAS_PASSWORD in
 # ~/.gradle/gradle.properties. LEEK_UNSIGNED=1 builds unsigned APKs instead,
@@ -22,6 +23,8 @@
 #                       project release key); abort on mismatch
 #   LEEK_HOST_DIR       the main repo's host/ (default: ../host)
 #   LEEK_SKIP_NATIVE=1  keep the libleek_android.so already in jniLibs
+#   LEEK_SKIP_GRADLE=1  sign and collect the APKs Gradle already built for this
+#                       commit (after a signing failure; refused if older)
 #   LEEK_ALLOW_SNAPSHOT=1  build even though a dependency is a -SNAPSHOT
 #   LEEK_ALLOW_DIRTY=1  build with uncommitted changes (never for a release)
 #   LEEK_OUT            output directory (default: build/leekwallet-release/<version>)
@@ -61,7 +64,7 @@ APKSIGNER="$(ls -d "$SDK_DIR"/build-tools/*/apksigner 2>/dev/null | sort -V | ta
 [[ -n "$APKSIGNER" ]] || die "apksigner not found (Android SDK build-tools)"
 AAPT2="$(ls -d "$SDK_DIR"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -n 1 || true)"
 ZIPALIGN="$(ls -d "$SDK_DIR"/build-tools/*/zipalign 2>/dev/null | sort -V | tail -n 1 || true)"
-for t in git java sha256sum unzip; do
+for t in git java sha256sum unzip zip; do
   command -v "$t" >/dev/null || die "$t not found"
 done
 
@@ -101,10 +104,9 @@ elif [[ -n "${LEEK_RELEASE_KEYSTORE:-}" ]]; then
   if [[ -z "${LEEK_RELEASE_KEYSTORE_PASSWORD:-}" ]]; then
     read -r -s -p "Keystore password: " LEEK_RELEASE_KEYSTORE_PASSWORD; echo
   fi
-  if [[ -z "${LEEK_RELEASE_KEY_PASSWORD:-}" ]]; then
-    read -r -s -p "Key password (Enter = same): " LEEK_RELEASE_KEY_PASSWORD; echo
-    LEEK_RELEASE_KEY_PASSWORD="${LEEK_RELEASE_KEY_PASSWORD:-$LEEK_RELEASE_KEYSTORE_PASSWORD}"
-  fi
+  # Not asked for: keytool gives a PKCS12 key the keystore's password, and a
+  # second hidden prompt is one more place for a typo.
+  LEEK_RELEASE_KEY_PASSWORD="${LEEK_RELEASE_KEY_PASSWORD:-$LEEK_RELEASE_KEYSTORE_PASSWORD}"
   # Environment, not arguments, so the passwords stay out of the process list.
   export LEEK_RELEASE_KEYSTORE_PASSWORD LEEK_RELEASE_KEY_PASSWORD
   # Check the key now: a typo found after a 15-minute build costs the build.
@@ -112,6 +114,17 @@ elif [[ -n "${LEEK_RELEASE_KEYSTORE:-}" ]]; then
   keytool -list -keystore "$KS" -alias "$LEEK_RELEASE_KEY_ALIAS" \
     -storepass:env LEEK_RELEASE_KEYSTORE_PASSWORD >/dev/null 2>&1 ||
     die "cannot open alias $LEEK_RELEASE_KEY_ALIAS in $KS (wrong password or alias?)"
+  # -list only proves the keystore password, and keytool ignores a wrong key
+  # password on PKCS12. So sign a throwaway zip with apksigner, the same call
+  # that signs the APKs later.
+  probe="$(mktemp -d)"
+  echo probe >"$probe/probe" && (cd "$probe" && zip -q probe.zip probe)
+  "$APKSIGNER" sign --min-sdk-version 24 --v4-signing-enabled false \
+    --ks "$KS" --ks-key-alias "$LEEK_RELEASE_KEY_ALIAS" \
+    --ks-pass env:LEEK_RELEASE_KEYSTORE_PASSWORD --key-pass env:LEEK_RELEASE_KEY_PASSWORD \
+    --out "$probe/signed.zip" "$probe/probe.zip" >/dev/null 2>&1 ||
+    { rm -rf "$probe"; die "the keystore opens but apksigner cannot use key $LEEK_RELEASE_KEY_ALIAS (key password?)"; }
+  rm -rf "$probe"
   [[ -x "$ZIPALIGN" ]] || die "zipalign not found (Android SDK build-tools)"
   # Gradle builds unsigned and apksigner signs after, as app/scripts/android-release.sh
   # in the main repository does: Gradle's signing step failed on the PKCS12
@@ -145,6 +158,17 @@ fi
 
 # --- build -------------------------------------------------------------------
 TASKS=(":app:assembleZcashmainnet${DIST_CAP}Release" ":app:assembleZcashtestnet${DIST_CAP}Release")
+if [[ "${LEEK_SKIP_GRADLE:-}" == 1 ]]; then
+  note "LEEK_SKIP_GRADLE=1: reusing the APKs already built"
+  # The last commit that changed what goes into the APKs (this script does not).
+  commit_time="$(git log -1 --format=%ct -- . ':!scripts')"
+  for net in mainnet testnet; do
+    for f in app/build/outputs/apk/zcash${net}${DIST_CAP}/release/*.apk; do
+      [[ -f "$f" ]] || die "no APK built for $net; run without LEEK_SKIP_GRADLE"
+      (( $(stat -c %Y "$f") >= commit_time )) || die "$f is older than HEAD; rebuild"
+    done
+  done
+else
 note "gradle ${TASKS[*]}"
 # shellcheck disable=SC2086
 ./gradlew --no-daemon --no-build-cache --no-configuration-cache \
@@ -156,6 +180,7 @@ note "gradle ${TASKS[*]}"
   "${GRADLE_SIGN_ARGS[@]}" \
   ${LEEK_GRADLE_ARGS:-} \
   :app:clean "${TASKS[@]}"
+fi
 
 # --- collect -----------------------------------------------------------------
 declare -A PKG=([mainnet]="" [testnet]="")

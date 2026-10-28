@@ -1,0 +1,11 @@
+# libleek_android.so (host/leek-android) calls these by name through JNI:
+# UsbIo.write/read, BleIo.sendFrame/recvFrame and PasskeyListener.onPasskey.
+# Nothing in Kotlin calls them, so without these rules R8 removes them from a
+# release build and every board call fails (3.17.0-leek.1 shipped that way).
+-keep interface io.leekwallet.zcash.hw.UsbIo { *; }
+-keep interface io.leekwallet.zcash.hw.BleIo { *; }
+-keep interface io.leekwallet.zcash.hw.PasskeyListener { *; }
+-keep class * implements io.leekwallet.zcash.hw.UsbIo { *; }
+-keep class * implements io.leekwallet.zcash.hw.BleIo { *; }
+-keep class * implements io.leekwallet.zcash.hw.PasskeyListener { *; }
+-keepclasseswithmembernames class io.leekwallet.zcash.hw.** { native <methods>; }

@@ -48,6 +48,12 @@ sealed interface LeekStatus {
 
     /** The device shows its address: compare it with the app's, answer on the device. */
     data object CompareAddress : LeekStatus
+
+    /**
+     * zGetAccount: the device asks before it shares the viewing key (once per session), and
+     * answers only after OK on it.
+     */
+    data object ShareViewKey : LeekStatus
 }
 
 /** The account a LeekWallet device exports (zGetAccount). */
@@ -90,7 +96,7 @@ class LeekWalletDevice(
     /** Account 0 of the device: what the app imports as a watch-only, device-signed account. */
     suspend fun readAccount(): LeekAccountInfo =
         session { h ->
-            mutableStatus.value = LeekStatus.Working("Reading the account")
+            mutableStatus.value = LeekStatus.ShareViewKey
             val json = JSONObject(LeekDeviceNative.getAccount(h, ACCOUNT, networkName))
             LeekAccountInfo(
                 ufvk = json.getString("ufvk"),

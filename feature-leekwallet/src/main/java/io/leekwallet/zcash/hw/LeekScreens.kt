@@ -203,6 +203,11 @@ private fun StatusView(status: LeekStatus) {
         LeekStatus.Unlock -> Busy("Enter your PIN on the device if it asks.")
         LeekStatus.ReviewOnDevice ->
             Busy("Review the transaction on the device. Accept on its last page to sign.")
+        LeekStatus.ShareViewKey ->
+            Busy(
+                "Confirm on the device to share this account's viewing key. It lets this phone " +
+                    "see your balance and history, but not spend."
+            )
         is LeekStatus.Working -> Busy(status.what + "...")
         LeekStatus.Connecting, LeekStatus.Idle -> Busy("Connecting to the LeekWallet...")
         LeekStatus.CompareAddress ->

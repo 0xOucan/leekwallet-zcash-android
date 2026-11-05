@@ -212,6 +212,7 @@ dependencies {
     implementation(projects.featureLedger)
     implementation(projects.featureLeekwallet)
     implementation(projects.featureMigration)
+    implementation(projects.featureViewingKey)
     implementation(projects.featureVoting)
 
     androidTestImplementation(projects.testLib)

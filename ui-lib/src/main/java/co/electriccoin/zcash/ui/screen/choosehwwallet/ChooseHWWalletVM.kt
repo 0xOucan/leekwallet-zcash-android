@@ -6,9 +6,10 @@ import cash.z.ecc.sdk.ANDROID_STATE_FLOW_TIMEOUT
 import co.electriccoin.zcash.ui.NavigationRouter
 import co.electriccoin.zcash.ui.R
 import co.electriccoin.zcash.ui.common.ledger.LedgerNavigator
-import co.electriccoin.zcash.ui.common.model.KeystoneAccount
-import co.electriccoin.zcash.ui.common.model.LedgerAccount
 import co.electriccoin.zcash.ui.common.model.WalletAccount
+import co.electriccoin.zcash.ui.common.model.canConnectKeystone
+import co.electriccoin.zcash.ui.common.model.canConnectLedger
+import co.electriccoin.zcash.ui.common.model.canConnectLeekWallet
 import co.electriccoin.zcash.ui.common.usecase.GetWalletAccountsUseCase
 import co.electriccoin.zcash.ui.design.util.imageRes
 import co.electriccoin.zcash.ui.design.util.stringRes
@@ -46,23 +47,19 @@ class ChooseHWWalletVM(
                         contentDescription = stringRes(R.string.accounts_keystone),
                         testTag = ChooseHWWalletTag.KEYSTONE_CARD,
                         onClick = ::onKeystoneClick,
-                    ).takeIf {
-                        accounts.orEmpty().none { account -> account is KeystoneAccount && !account.isLeekWallet }
-                    },
+                    ).takeIf { accounts.canConnectKeystone() },
                     HWWalletCardState(
                         image = imageRes(R.drawable.img_hw_wallet_ledger),
                         contentDescription = stringRes(R.string.accounts_ledger),
                         testTag = ChooseHWWalletTag.LEDGER_CARD,
                         onClick = ::onLedgerClick,
-                    ).takeIf { accounts.orEmpty().none { account -> account is LedgerAccount } },
+                    ).takeIf { accounts.canConnectLedger() },
                     HWWalletCardState(
                         image = imageRes(R.drawable.img_hw_wallet_leekwallet),
                         contentDescription = stringRes(R.string.accounts_leekwallet),
                         testTag = "LEEKWALLET_CARD",
                         onClick = leekWalletNavigator::forwardToConnect,
-                    ).takeIf {
-                        accounts.orEmpty().none { account -> account is KeystoneAccount && account.isLeekWallet }
-                    },
+                    ).takeIf { accounts.canConnectLeekWallet() },
                 ),
             onBack = ::onBack,
         )

@@ -12,10 +12,10 @@ import co.electriccoin.zcash.migration.migrationLog
 import co.electriccoin.zcash.ui.NavigationRouter
 import co.electriccoin.zcash.ui.R
 import co.electriccoin.zcash.ui.common.datasource.ZashiSpendingKeyDataSource
+import co.electriccoin.zcash.ui.common.model.AccountOperationUnsupportedException
 import co.electriccoin.zcash.ui.common.model.KeystoneAccount
 import co.electriccoin.zcash.ui.common.model.LceState
 import co.electriccoin.zcash.ui.common.model.LedgerAccount
-import co.electriccoin.zcash.ui.common.model.LedgerOperationUnsupportedException
 import co.electriccoin.zcash.ui.common.model.groupLce
 import co.electriccoin.zcash.ui.common.model.guardLoading
 import co.electriccoin.zcash.ui.common.model.migration.MigrationKeystoneRound
@@ -29,7 +29,9 @@ import co.electriccoin.zcash.ui.common.model.migration.migrationFailureMessage
 import co.electriccoin.zcash.ui.common.model.migration.preparationStepStatus
 import co.electriccoin.zcash.ui.common.model.migration.preparationStepTimeLabel
 import co.electriccoin.zcash.ui.common.model.migration.preparationStepTitle
+import co.electriccoin.zcash.ui.common.model.migration.rateReferenceHeight
 import co.electriccoin.zcash.ui.common.model.mutableLce
+import co.electriccoin.zcash.ui.common.model.requireSpendable
 import co.electriccoin.zcash.ui.common.model.stateIn
 import co.electriccoin.zcash.ui.common.model.toStorageKeyId
 import co.electriccoin.zcash.ui.common.model.withLce
@@ -107,6 +109,27 @@ class MigrationReviewVM(
     @Volatile
     private var secondsPerBlock: Long = DEFAULT_SECONDS_PER_BLOCK
 
+    /**
+     * The wallet network's NU7 activation height, captured with [secondsPerBlock]: a plan whose heights span it is
+     * converted to time in two segments (75 s before, 25 s from activation), not one.
+     */
+    @Volatile
+    private var nu7ActivationHeight: Long? = null
+
+    /**
+     * The height the measured rate belongs to: the estimated chain tip it was read at, not a plan anchor, which sits
+     * up to 287 blocks below it. Attributing the rate to a plan's own start would price the post-NU7 blocks of a
+     * plan anchored just before NU7 as if the rate were a pre-NU7 one.
+     */
+    @Volatile
+    private var rateReferenceTip: Long? = null
+
+    private fun secondsBetween(
+        fromHeight: Long,
+        toHeight: Long,
+        rateHeight: Long = rateReferenceTip ?: fromHeight,
+    ): Long = estimatedSecondsBetweenHeights(fromHeight, toHeight, secondsPerBlock, nu7ActivationHeight, rateHeight)
+
     private val proposeLce = mutableLce<ReviewProposal>()
     private val confirmLce = mutableLce<Unit>()
     private val isKeystoneAccount = getSelectedWalletAccount.observe().map { it is KeystoneAccount }
@@ -177,6 +200,12 @@ class MigrationReviewVM(
                             }
                         val t0 = SystemClock.elapsedRealtime()
                         secondsPerBlock = sdk.estimatedSecondsPerBlock()
+                        nu7ActivationHeight = sdk.nu7ActivationHeight
+                        rateReferenceTip =
+                            rateReferenceHeight(
+                                estimatedTip = sdk.estimatedChainTip(),
+                                fallbackHeight = schedule.transfers.maxOfOrNull { it.anchorHeight },
+                            )
                         migrationLog(
                             "MIGRATION_DIAG ReviewVM: estimatedSecondsPerBlock done in " +
                                 "${SystemClock.elapsedRealtime() - t0}ms"
@@ -239,7 +268,7 @@ class MigrationReviewVM(
         // transfer's own "due in ~Nh" label showed).
         val anchorHeight = sched.transfers.minOfOrNull { it.anchorHeight } ?: 0L
         val lastAtHeight = sched.transfers.maxOfOrNull { it.nextExecutableAfterHeight } ?: 0L
-        val spanSeconds = estimatedSecondsBetweenHeights(anchorHeight, lastAtHeight, secondsPerBlock)
+        val spanSeconds = secondsBetween(anchorHeight, lastAtHeight)
         val totalAmount = stringRes(Zatoshi(total))
         return MigrationReviewState(
             mode = args.mode,
@@ -359,8 +388,9 @@ class MigrationReviewVM(
 
     private suspend fun confirmAutomatic(sched: MigrationSchedule) {
         if (getSelectedWalletAccount() is LedgerAccount) {
-            throw LedgerOperationUnsupportedException()
+            throw AccountOperationUnsupportedException.ledger()
         }
+        getSelectedWalletAccount().requireSpendable()
         if (getSelectedWalletAccount() is KeystoneAccount) {
             // Keystone can't sign in-process — hand the unsigned schedule off to the QR
             // sign/scan detour; FinalizeMigrationScheduleUseCase runs after a successful scan
@@ -452,8 +482,9 @@ class MigrationReviewVM(
     private fun onConfirmImmediate(proposal: Proposal, amountZatoshi: Zatoshi) =
         confirmLce.execute {
             if (getSelectedWalletAccount() is LedgerAccount) {
-                throw LedgerOperationUnsupportedException()
+                throw AccountOperationUnsupportedException.ledger()
             }
+            getSelectedWalletAccount().requireSpendable()
             if (getSelectedWalletAccount() is KeystoneAccount) {
                 // Keystone can't sign in-process — adopt the already-built send-max proposal into the
                 // app's existing generic external-signer pipeline exactly as an ordinary Keystone
@@ -520,8 +551,8 @@ class MigrationReviewVM(
                 var prev = referenceTip
                 sched.transfers.forEachIndexed { i, t ->
                     val fromNow =
-                        estimatedSecondsBetweenHeights(referenceTip, t.nextExecutableAfterHeight, secondsPerBlock)
-                    val gap = estimatedSecondsBetweenHeights(prev, t.nextExecutableAfterHeight, secondsPerBlock)
+                        secondsBetween(referenceTip, t.nextExecutableAfterHeight)
+                    val gap = secondsBetween(prev, t.nextExecutableAfterHeight)
                     prev = t.nextExecutableAfterHeight
                     appendLine(
                         "MIGRATION_DIAG Plan: transfer[${i + 1}] " +
@@ -535,7 +566,7 @@ class MigrationReviewVM(
     }
 
     private fun scheduledLabel(t: TransferProposal): StringResource {
-        val secondsUntil = estimatedSecondsBetweenHeights(t.anchorHeight, t.nextExecutableAfterHeight, secondsPerBlock)
+        val secondsUntil = secondsBetween(t.anchorHeight, t.nextExecutableAfterHeight)
         return when {
             secondsUntil <= 0 -> stringRes("Ready now")
 
@@ -551,7 +582,7 @@ class MigrationReviewVM(
         sched: MigrationSchedule,
     ): StringResource {
         val baseline = sched.transfers.minOfOrNull { it.anchorHeight } ?: p.broadcastHeight
-        val secondsUntil = estimatedSecondsBetweenHeights(baseline, p.broadcastHeight, secondsPerBlock)
+        val secondsUntil = secondsBetween(baseline, p.broadcastHeight)
         return if (secondsUntil <= 0) stringRes("Ready now") else stringRes(formatMigrationDuration(secondsUntil))
     }
 
@@ -564,7 +595,7 @@ class MigrationReviewVM(
         if (preparations.size <= 1) return null
         val first = preparations.minByOrNull { it.broadcastHeight } ?: return null
         val baseline = sched.transfers.minOfOrNull { it.anchorHeight } ?: first.broadcastHeight
-        val secondsUntil = estimatedSecondsBetweenHeights(baseline, first.broadcastHeight, secondsPerBlock)
+        val secondsUntil = secondsBetween(baseline, first.broadcastHeight)
         return preparationStepTimeLabel(secondsUntil) + stringRes(" · ${preparations.size} steps")
     }
 
@@ -586,7 +617,7 @@ class MigrationReviewVM(
             steps =
                 preparations.mapIndexed { i, p ->
                     val dependsOnNumbers = p.dependsOn.mapNotNull { numberById[it] }.sorted()
-                    val secondsUntil = estimatedSecondsBetweenHeights(baseline, p.broadcastHeight, secondsPerBlock)
+                    val secondsUntil = secondsBetween(baseline, p.broadcastHeight)
                     MigrationPreparationStepDetail(
                         title = preparationStepTitle(i + 1, preparations.size),
                         timeLabel = preparationStepTimeLabel(secondsUntil),

@@ -6,10 +6,12 @@ import co.electriccoin.zcash.ui.common.datasource.MessageAvailabilityDataSource
 import co.electriccoin.zcash.ui.common.ledger.LedgerNavigator
 import co.electriccoin.zcash.ui.common.leekwallet.LeekWalletNavigator
 import co.electriccoin.zcash.ui.common.ledger.LedgerProposalPipeline
+import co.electriccoin.zcash.ui.common.model.AccountOperationUnsupportedException
 import co.electriccoin.zcash.ui.common.model.KeystoneAccount
 import co.electriccoin.zcash.ui.common.model.LedgerAccount
 import co.electriccoin.zcash.ui.common.model.SubmitResult
-import co.electriccoin.zcash.ui.common.model.ZashiAccount
+import co.electriccoin.zcash.ui.common.model.ViewOnlyAccount
+import co.electriccoin.zcash.ui.common.model.ZodlAccount
 import co.electriccoin.zcash.ui.common.repository.KeystoneProposalRepository
 import co.electriccoin.zcash.ui.common.repository.ZashiProposalRepository
 import co.electriccoin.zcash.ui.screen.error.ErrorArgs
@@ -52,7 +54,15 @@ class ShieldFundsUseCase(
                         createLedgerShieldProposal()
                     }
 
-                    is ZashiAccount -> {
+                    is ViewOnlyAccount -> {
+                        navigateToError(
+                            ErrorArgs.General(
+                                AccountOperationUnsupportedException.viewOnly()
+                            )
+                        )
+                    }
+
+                    is ZodlAccount -> {
                         if (closeCurrentScreen) {
                             navigationRouter.back()
                         }

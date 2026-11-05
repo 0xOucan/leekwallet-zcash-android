@@ -9,7 +9,7 @@ import co.electriccoin.zcash.ui.common.leekwallet.LeekWalletNavigator
 import co.electriccoin.zcash.ui.common.model.KeystoneAccount
 import co.electriccoin.zcash.ui.common.model.LedgerAccount
 import co.electriccoin.zcash.ui.common.model.SubmitResult
-import co.electriccoin.zcash.ui.common.model.ZashiAccount
+import co.electriccoin.zcash.ui.common.model.ZodlAccount
 import co.electriccoin.zcash.ui.common.repository.KeystoneProposalRepository
 import co.electriccoin.zcash.ui.common.repository.ZashiProposalRepository
 import co.electriccoin.zcash.ui.screen.error.ErrorArgs
@@ -190,7 +190,7 @@ class ShieldFundsUseCaseTest {
             mockk<ZashiProposalRepository>(relaxed = true) { coEvery { submit() } returns submitResult },
         navigationRouter = mockk<NavigationRouter>(relaxed = true),
         accountDataSource =
-            mockk<AccountDataSource> { coEvery { getSelectedAccount() } returns mockk<ZashiAccount>() },
+            mockk<AccountDataSource> { coEvery { getSelectedAccount() } returns mockk<ZodlAccount>() },
         navigateToError = navigateToError,
         messageAvailabilityDataSource = mockk<MessageAvailabilityDataSource>(relaxed = true)
     )

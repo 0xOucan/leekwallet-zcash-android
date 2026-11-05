@@ -7,6 +7,72 @@ and this application adheres to [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+## [3.19.0 (3234)] - 2026-10-29
+
+### Changed:
+
+- Migration time estimates, the plan's total duration and the Syncing banner follow NU7's 25-second target block
+  spacing. An estimate that reaches past the NU7 activation height counts each side at its own spacing, and the
+  Syncing banner still opens at three days behind.
+- The scheduled (private) Ironwood migration is not offered until the chain reaches the NU7 activation height, and
+  the Setup screen shows it as available after the upgrade with the estimated date. The one-transaction migration
+  stays available at every height, and a migration that is already running keeps sending its valid transfers until
+  the activation. After NU7 a run that still holds a transfer signed for the old consensus branch is cancelled and a
+  one-time Home notice offers to migrate what is left. Confirmed transfers are unaffected, and unconfirmed ones can
+  stay unavailable until they expire and the wallet syncs.
+- Restarting a migration that has a transfer needing attention, before NU7, ends the run and opens the Setup screen
+  (the scheduled migration is shown as available after the upgrade, the one-transaction one now) instead of failing.
+- The Keystone signing and scanning screens explain that a scheduled migration cannot start before NU7 instead of a
+  generic error. Spanish copy was added for the new migration messages. A wallet that has not synced yet is told to
+  finish syncing instead.
+
+## [3.18.0 (3206)] - 2026-10-23
+
+### Added:
+
+- You can now add a view-only account by importing a Unified Full Viewing Key: tap Add Account in
+  the Wallets & Hardware screen, choose Import full viewing key, paste the key or scan its QR code,
+  tell Zodl when the account was created, then name it and pick its colour. A view-only account
+  shows its balance, addresses and activity, receives funds, swaps into ZEC, exports its viewing
+  key and tax file, and is marked View Only under its name at the top of Home. It holds no spending
+  key, so Home offers only Receive and Swap for it, and sending, paying, shielding, swapping from
+  ZEC, voting and migration are refused. A key that is malformed, for another network, or missing
+  its Orchard or transparent part is rejected, a key that is already in the wallet is not added
+  twice, and a name another account already shows is refused.
+- A view-only account can now be edited and removed from the "..." of its row in the Wallets &
+  Hardware screen. Edit Account renames it, up to 12 characters, and changes its colour; Save
+  changes is enabled once the name or the colour is new and the name is not one another account
+  already shows. The new name shows everywhere the account appears, and the account's icon shows
+  in its colour. The name is kept on this device only. Remove Account asks for confirmation and
+  then for your device authentication, and removes the account from Zodl on this device while
+  keeping your address book contacts and the account's other metadata; if it was the selected
+  account, the Zodl account is selected again. The Zodl account's name and colour cannot be edited.
+
+### Changed:
+
+- The account picker opened from the account switch at the top of Home is now the full-screen
+  Wallets & Hardware screen instead of a sheet. It groups the wallets into Zodl, Keystone, Ledger and
+  view-only sections, shows each wallet's balance, which hides with Hide Balances, and marks the
+  selected wallet. Tapping a wallet selects it; the "..." of a Keystone or Ledger wallet opens
+  Wallet Options, from which Disconnect hardware wallet disconnects that wallet even while another
+  one is selected; disconnecting a hardware wallet moved there from Advanced Settings, which no
+  longer offers it. While no Keystone is connected the screen shows the Keystone shop offer again.
+- The Wallets & Hardware screen's Connect Hardware Wallet button is now Add Account, which offers
+  connecting a hardware wallet, while one can still be added, and importing a viewing key.
+
+## [3.17.2 (3157)] - 2026-10-20
+
+### Fixed:
+
+- Updated the Zcash SDK to 5.2.2, which refreshes the bundled Rust TLS root certificates (`rustls-webpki`, `webpki-roots`), so connections made from the Rust layer (including Tor) no longer trust the revoked eMudhra roots.
+
+## [3.17.1 (3155)] - 2026-10-14
+
+### Changed:
+
+- Updated the SDK to 5.2.1, which builds `pasta_curves` with its `asm` feature. Proving, syncing and
+  shielded transactions use the assembly field arithmetic on 64-bit devices (`arm64-v8a`, `x86_64`).
+
 ## [3.17.0 (3149)] - 2026-10-10
 
 ### Added:

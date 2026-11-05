@@ -28,7 +28,6 @@ import co.electriccoin.zcash.ui.design.util.StringResource
 import co.electriccoin.zcash.ui.design.util.asPrivacySensitive
 import co.electriccoin.zcash.ui.design.util.imageRes
 import co.electriccoin.zcash.ui.design.util.stringRes
-import co.electriccoin.zcash.ui.screen.ExternalUrl
 import co.electriccoin.zcash.ui.screen.accountlist.options.WalletOptionsArgs
 import co.electriccoin.zcash.ui.screen.editaccount.EditAccountArgs
 import io.mockk.coVerify
@@ -59,9 +58,8 @@ import co.electriccoin.zcash.ui.R as UiR
 /**
  * The full-screen "Wallets & Hardware" selector: the wallets grouped into Zodl, Keystone, Ledger and
  * view-only sections in that order whatever order they arrive in, each row with its avatar, its
- * balance (privacy-sensitive, a placeholder while unknown) and its trailing action; the Keystone
- * promo while no Keystone is connected; and the "Add Account" call to action once the wallets
- * are loaded. Every row carries its own account's coloured icon, and a colour change redraws only
+ * balance (privacy-sensitive, a placeholder while unknown) and its trailing action; and the "Add
+ * Account" call to action once the wallets are loaded. Every row carries its own account's coloured icon, and a colour change redraws only
  * that row.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -427,7 +425,7 @@ class AccountListVMTest {
         }
 
     @Test
-    fun aLeekWalletHasItsOwnSectionBetweenKeystoneAndLedgerAndNoKeystonePromo() =
+    fun aLeekWalletHasItsOwnSectionBetweenKeystoneAndLedger() =
         runTest {
             val leekWallet =
                 keystone(id = 3, isSelected = false).copy(
@@ -457,54 +455,6 @@ class AccountListVMTest {
                 ),
                 assertNotNull(vm.state.value.sections).map { it.title }
             )
-
-            val onlyLeekWallet = vm(listOf(zodl(id = 1, isSelected = true), leekWallet))
-            collect(onlyLeekWallet)
-            assertNull(onlyLeekWallet.state.value.keystonePromo)
-        }
-
-    @Test
-    fun thePromoShowsUntilAKeystoneIsConnected() =
-        runTest {
-            listOf(
-                listOf(zodl(id = 1, isSelected = true)),
-                listOf(zodl(id = 1, isSelected = true), ledger(id = 2, isSelected = false)),
-                listOf(zodl(id = 1, isSelected = true), viewOnly(id = 2, isSelected = false)),
-            ).forEach { accounts ->
-                val vm = vm(accounts)
-                collect(vm)
-                assertNotNull(vm.state.value.keystonePromo)
-            }
-
-            listOf(
-                listOf(zodl(id = 1, isSelected = true), keystone(id = 2, isSelected = false)),
-                listOf(
-                    zodl(id = 1, isSelected = true),
-                    keystone(id = 2, isSelected = false),
-                    ledger(id = 3, isSelected = false)
-                ),
-            ).forEach { accounts ->
-                val vm = vm(accounts)
-                collect(vm)
-                assertNull(vm.state.value.keystonePromo)
-            }
-        }
-
-    @Test
-    fun thePromoOpensTheKeystoneShopInTheBrowserOnTopOfThisScreen() =
-        runTest {
-            val navigationRouter = mockk<NavigationRouter>(relaxed = true)
-            val vm = vm(listOf(zodl(id = 1, isSelected = true)), navigationRouter = navigationRouter)
-            collect(vm)
-
-            val promo = assertNotNull(vm.state.value.keystonePromo)
-            assertEquals(stringRes(UiR.string.hwWallet_promo_title), promo.title)
-            promo.onClick()
-
-            verify(exactly = 1) {
-                navigationRouter.forward(ExternalUrl("https://keyst.one/shop/products/keystone-3-pro?discount=Zodl"))
-            }
-            verify(exactly = 0) { navigationRouter.replace(*anyVararg()) }
         }
 
     @Test
@@ -535,7 +485,6 @@ class AccountListVMTest {
 
             val state = vm.state.value
             assertNull(state.sections)
-            assertNull(state.keystonePromo)
             assertNull(state.addAccountButton)
             assertEquals(stringRes(UiR.string.hwWallet_drawer_title), state.title)
         }

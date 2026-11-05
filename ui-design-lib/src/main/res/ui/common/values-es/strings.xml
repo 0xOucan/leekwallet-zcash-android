@@ -95,8 +95,6 @@
     <string name="hwWallet_section_ledger">Billetera Ledger</string>
     <string name="hwWallet_section_ledger_plural">Billeteras Ledger</string>
     <string name="hwWallet_walletOptions_contentDescription">Opciones de %1$s</string>
-    <string name="hwWallet_promo_title">Billetera de hardware Keystone</string>
-    <string name="hwWallet_promo_message">Obtén un 5%% de descuento en una billetera de hardware aislada. Código promocional “Zodl”.</string>
     <string name="hwWallet_options_title">Opciones de billetera</string>
     <string name="hwWallet_options_disconnect_title">Desconectar billetera de hardware</string>
     <string name="hwWallet_options_disconnect_keystone">Desvincula tu dispositivo Keystone.</string>

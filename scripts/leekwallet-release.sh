@@ -3,7 +3,7 @@
 # write SHA256SUMS and BUILDINFO.txt, show the signing certificate, and print
 # (never run) the commands that sign the checksums and publish the release.
 #
-#   scripts/leekwallet-release.sh 3.17.0-leek.1
+#   scripts/leekwallet-release.sh 3.19.0-leek.1
 #
 # Signing (nothing secret lives in this repository). Either export:
 #   LEEK_RELEASE_KEYSTORE           path to the release keystore, outside the repo
@@ -39,7 +39,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 VERSION_NAME="${1:-}"
-[[ -n "$VERSION_NAME" ]] || die "usage: $0 <versionName>, e.g. $0 3.17.0-leek.1"
+[[ -n "$VERSION_NAME" ]] || die "usage: $0 <versionName>, e.g. $0 3.19.0-leek.1"
 [[ "$VERSION_NAME" =~ ^[0-9A-Za-z.+-]+$ ]] || die "versionName has odd characters: $VERSION_NAME"
 
 prop() { sed -n "s/^$1=//p" "$ROOT/gradle.properties" | tail -n 1; }

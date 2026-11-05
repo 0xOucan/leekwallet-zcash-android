@@ -100,7 +100,7 @@ cd android && git checkout <commit from BUILDINFO.txt>
 
 # JDK 21, Android SDK, NDK 27.2.12479018, Rust with aarch64-linux-android
 # (the version in BUILDINFO.txt): see README.md, Build.
-LEEK_UNSIGNED=1 LEEK_ALLOW_SNAPSHOT=1 LEEK_VERSION_CODE=<versionCode> \
+LEEK_UNSIGNED=1 LEEK_VERSION_CODE=<versionCode> \
   scripts/leekwallet-release.sh <version>
 ```
 
@@ -125,9 +125,6 @@ say dependency hash verification is *not* enabled, and
 [CI.md](docs/CI.md) says plainly that its CI builds are not byte-reproducible.
 On top of that:
 
-- the Zcash SDK is a `-SNAPSHOT` version at the moment, which can resolve to
-  different code on a later day (the script refuses to build unless you
-  accept it with `LEEK_ALLOW_SNAPSHOT=1`);
 - the native library is built by Rust and the NDK; the script strips local
   paths (`--remap-path-prefix`) and uses the locked `Cargo.lock`, but a
   different Rust version gives different bytes;
@@ -150,7 +147,7 @@ far as you trust the source.
    ```sh
    export LEEK_RELEASE_KEYSTORE=~/keys/leekwallet-release.jks
    export LEEK_RELEASE_KEY_ALIAS=leekwallet
-   LEEK_ALLOW_SNAPSHOT=1 scripts/leekwallet-release.sh 3.17.0-leek.1
+   scripts/leekwallet-release.sh 3.19.0-leek.1
    ```
 
    The passwords are asked for (or read from `LEEK_RELEASE_KEYSTORE_PASSWORD`
@@ -169,8 +166,8 @@ far as you trust the source.
    (`LEEK_CERT_SHA256` defaults to it).
 
 **Versions.** versionName is Zodl's version plus a LeekWallet counter, e.g.
-`3.17.0-leek.1`, `3.17.0-leek.2`, then `3.18.0-leek.1` after rebasing on
-Zodl 3.18.0; the tag is `v<versionName>`. versionCode defaults to the commit
+`3.17.0-leek.1`, `3.17.0-leek.2`, then `3.19.0-leek.1` after merging
+Zodl 3.19.0; the tag is `v<versionName>`. versionCode defaults to the commit
 count of the built commit (Zodl's own rule); it must grow with every
 release, or phones refuse the update.
 

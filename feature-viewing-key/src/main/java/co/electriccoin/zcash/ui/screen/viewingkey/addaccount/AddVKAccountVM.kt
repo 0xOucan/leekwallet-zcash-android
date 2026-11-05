@@ -20,7 +20,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Offers the ways to add an account. Connecting a hardware wallet is offered while the wallet holds
- * no account of some vendor, the same rule the vendor picker lists the vendors by. Picking an option
+ * no LeekWallet account, the same rule the picker lists its card by. Picking an option
  * first hides the sheet and only then replaces it with the chosen flow, so the sheet animates away
  * instead of vanishing under the next screen and leaves no hidden destination behind on the back
  * stack.

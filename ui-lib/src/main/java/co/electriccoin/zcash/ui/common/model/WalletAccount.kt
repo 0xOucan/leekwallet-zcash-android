@@ -458,28 +458,14 @@ private operator fun WalletBalance.plus(other: WalletBalance) =
 fun WalletAccount?.canSpend(amount: Zatoshi): Boolean? = if (this == null) false else canSpend(amount)
 
 /**
- * Whether a Keystone wallet can still be connected: the wallet holds at most one account per
- * hardware vendor.
- */
-internal fun List<WalletAccount>?.canConnectKeystone(): Boolean =
-    orEmpty().none { it is KeystoneAccount && !it.isLeekWallet }
-
-/**
  * Whether a LeekWallet can still be connected. A LeekWallet account is a Keystone-shaped
- * [KeystoneAccount], but a vendor of its own: it does not use up Keystone's slot, nor Keystone its.
+ * [KeystoneAccount]; a real Keystone or Ledger account in the wallet does not use up its slot.
  */
 internal fun List<WalletAccount>?.canConnectLeekWallet(): Boolean =
     orEmpty().none { it is KeystoneAccount && it.isLeekWallet }
 
 /**
- * Whether a Ledger wallet can still be connected: the wallet holds at most one account per hardware
- * vendor.
+ * Whether a hardware wallet can still be connected. In this fork that means a LeekWallet: Keystone
+ * and Ledger accounts already in a wallet keep working, but no new ones can be connected.
  */
-internal fun List<WalletAccount>?.canConnectLedger(): Boolean = orEmpty().none { it is LedgerAccount }
-
-/**
- * Whether any hardware vendor is still left to connect. A view-only account is not a hardware wallet
- * and does not count.
- */
-fun List<WalletAccount>?.canConnectHardwareWallet(): Boolean =
-    canConnectKeystone() || canConnectLedger() || canConnectLeekWallet()
+fun List<WalletAccount>?.canConnectHardwareWallet(): Boolean = canConnectLeekWallet()

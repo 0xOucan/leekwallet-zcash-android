@@ -5,15 +5,11 @@ import androidx.lifecycle.viewModelScope
 import cash.z.ecc.sdk.ANDROID_STATE_FLOW_TIMEOUT
 import co.electriccoin.zcash.ui.NavigationRouter
 import co.electriccoin.zcash.ui.R
-import co.electriccoin.zcash.ui.common.ledger.LedgerNavigator
 import co.electriccoin.zcash.ui.common.model.WalletAccount
-import co.electriccoin.zcash.ui.common.model.canConnectKeystone
-import co.electriccoin.zcash.ui.common.model.canConnectLedger
 import co.electriccoin.zcash.ui.common.model.canConnectLeekWallet
 import co.electriccoin.zcash.ui.common.usecase.GetWalletAccountsUseCase
 import co.electriccoin.zcash.ui.design.util.imageRes
 import co.electriccoin.zcash.ui.design.util.stringRes
-import co.electriccoin.zcash.ui.screen.connectkeystone.connect.ConnectKeystoneArgs
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.WhileSubscribed
@@ -23,7 +19,6 @@ import kotlinx.coroutines.flow.stateIn
 class ChooseHWWalletVM(
     getWalletAccounts: GetWalletAccountsUseCase,
     private val navigationRouter: NavigationRouter,
-    private val ledgerNavigator: LedgerNavigator,
     private val leekWalletNavigator: co.electriccoin.zcash.ui.common.leekwallet.LeekWalletNavigator,
 ) : ViewModel() {
     val state: StateFlow<ChooseHWWalletState> =
@@ -43,30 +38,14 @@ class ChooseHWWalletVM(
             cards =
                 listOfNotNull(
                     HWWalletCardState(
-                        image = imageRes(R.drawable.img_hw_wallet_keystone),
-                        contentDescription = stringRes(R.string.accounts_keystone),
-                        testTag = ChooseHWWalletTag.KEYSTONE_CARD,
-                        onClick = ::onKeystoneClick,
-                    ).takeIf { accounts.canConnectKeystone() },
-                    HWWalletCardState(
-                        image = imageRes(R.drawable.img_hw_wallet_ledger),
-                        contentDescription = stringRes(R.string.accounts_ledger),
-                        testTag = ChooseHWWalletTag.LEDGER_CARD,
-                        onClick = ::onLedgerClick,
-                    ).takeIf { accounts.canConnectLedger() },
-                    HWWalletCardState(
                         image = imageRes(R.drawable.img_hw_wallet_leekwallet),
                         contentDescription = stringRes(R.string.accounts_leekwallet),
-                        testTag = "LEEKWALLET_CARD",
+                        testTag = ChooseHWWalletTag.LEEKWALLET_CARD,
                         onClick = leekWalletNavigator::forwardToConnect,
                     ).takeIf { accounts.canConnectLeekWallet() },
                 ),
             onBack = ::onBack,
         )
-
-    private fun onKeystoneClick() = navigationRouter.forward(ConnectKeystoneArgs)
-
-    private fun onLedgerClick() = ledgerNavigator.forwardToConnect()
 
     private fun onBack() = navigationRouter.back()
 }

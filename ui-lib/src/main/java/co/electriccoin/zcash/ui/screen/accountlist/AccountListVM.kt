@@ -139,8 +139,8 @@ class AccountListVM(
     private fun onKeystonePromoClick() = navigationRouter.forward(ExternalUrl(KEYSTONE_PROMO_URL))
 
     /**
-     * Opens the "Add Account" options, which offer a hardware wallet only while a vendor is still
-     * unconnected and always offer importing a viewing key.
+     * Opens the "Add Account" options, which offer a hardware wallet only while no LeekWallet is
+     * connected and always offer importing a viewing key.
      */
     private fun onAddAccountClick() = viewOnlyNavigator.forwardToAddAccount()
 

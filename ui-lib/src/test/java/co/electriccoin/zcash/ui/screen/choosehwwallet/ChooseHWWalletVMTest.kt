@@ -3,10 +3,9 @@ package co.electriccoin.zcash.ui.screen.choosehwwallet
 import cash.z.ecc.android.sdk.model.Account
 import cash.z.ecc.android.sdk.model.AccountUuid
 import cash.z.ecc.android.sdk.model.Zip32AccountIndex
-import co.electriccoin.zcash.ui.NavigationRouter
 import co.electriccoin.zcash.ui.R
-import co.electriccoin.zcash.ui.common.ledger.LedgerNavigator
 import co.electriccoin.zcash.ui.common.leekwallet.LEEKWALLET_KEY_SOURCE
+import co.electriccoin.zcash.ui.common.leekwallet.LeekWalletNavigator
 import co.electriccoin.zcash.ui.common.model.KeystoneAccount
 import co.electriccoin.zcash.ui.common.model.LedgerAccount
 import co.electriccoin.zcash.ui.common.model.WalletAccount
@@ -14,7 +13,6 @@ import co.electriccoin.zcash.ui.common.model.canConnectHardwareWallet
 import co.electriccoin.zcash.ui.common.usecase.GetWalletAccountsUseCase
 import co.electriccoin.zcash.ui.design.util.imageRes
 import co.electriccoin.zcash.ui.design.util.stringRes
-import co.electriccoin.zcash.ui.screen.connectkeystone.connect.ConnectKeystoneArgs
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -32,9 +30,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * The picker offers a vendor's card only while that vendor is unconnected, and each card routes to
- * that vendor's own connect flow. The LeekWallet card (a Keystone-shaped account with its own key
- * source) is offered beside them while no LeekWallet account exists.
+ * New connections are LeekWallet only: the picker offers its card while no LeekWallet account
+ * exists, whatever Keystone or Ledger accounts the wallet already holds.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChooseHWWalletVMTest {
@@ -51,112 +48,66 @@ class ChooseHWWalletVMTest {
     }
 
     @Test
-    fun showsBothCardsWhenNoHWWalletIsConnected() {
+    fun showsOnlyTheLeekWalletCardWhenNoHWWalletIsConnected() {
         val vm = vm(accounts = emptyList())
 
         assertEquals(
-            listOf(ChooseHWWalletTag.KEYSTONE_CARD, ChooseHWWalletTag.LEDGER_CARD, LEEKWALLET_CARD),
+            listOf(ChooseHWWalletTag.LEEKWALLET_CARD),
             vm.state.value.cards
                 .map { it.testTag }
         )
     }
 
     @Test
-    fun hidesTheKeystoneCardOnceAKeystoneAccountExists() {
-        val vm = vm(accounts = listOf(keystoneAccount()))
-
-        assertEquals(
-            listOf(ChooseHWWalletTag.LEDGER_CARD, LEEKWALLET_CARD),
-            vm.state.value.cards
-                .map { it.testTag }
-        )
-    }
-
-    @Test
-    fun hidesTheLedgerCardOnceALedgerAccountExists() {
-        val vm = vm(accounts = listOf(ledgerAccount()))
-
-        assertEquals(
-            listOf(ChooseHWWalletTag.KEYSTONE_CARD, LEEKWALLET_CARD),
-            vm.state.value.cards
-                .map { it.testTag }
-        )
-    }
-
-    @Test
-    fun offersOnlyLeekWalletOnceKeystoneAndLedgerAreConnected() {
+    fun existingKeystoneAndLedgerAccountsLeaveOnlyTheLeekWalletCard() {
         val vm = vm(accounts = listOf(keystoneAccount(), ledgerAccount()))
 
         assertEquals(
-            listOf(LEEKWALLET_CARD),
+            listOf(ChooseHWWalletTag.LEEKWALLET_CARD),
             vm.state.value.cards
                 .map { it.testTag }
         )
     }
 
     @Test
-    fun aLeekWalletAccountHidesOnlyTheLeekWalletCard() {
+    fun aLeekWalletAccountHidesTheCard() {
         val vm = vm(accounts = listOf(leekWalletAccount()))
 
-        assertEquals(
-            listOf(ChooseHWWalletTag.KEYSTONE_CARD, ChooseHWWalletTag.LEDGER_CARD),
-            vm.state.value.cards
-                .map { it.testTag }
-        )
+        assertEquals(emptyList(), vm.state.value.cards)
     }
 
     @Test
-    fun aHardwareWalletCanStillBeConnectedUntilEveryVendorIs() {
+    fun aHardwareWalletCanBeConnectedUntilALeekWalletIs() {
+        assertTrue(emptyList<WalletAccount>().canConnectHardwareWallet())
         assertTrue(listOf(keystoneAccount(), ledgerAccount()).canConnectHardwareWallet())
-        assertTrue(listOf(leekWalletAccount(), ledgerAccount()).canConnectHardwareWallet())
-        assertFalse(listOf(keystoneAccount(), ledgerAccount(), leekWalletAccount()).canConnectHardwareWallet())
+        assertFalse(listOf(leekWalletAccount()).canConnectHardwareWallet())
     }
 
     @Test
-    fun theHeaderAndEachPhotoCardFollowTheConnectHardwareWalletFrame() {
+    fun theHeaderAndTheCardFollowTheConnectHardwareWalletFrame() {
         val state = vm(accounts = emptyList()).state.value
 
         assertEquals(stringRes(R.string.chooseHWWallet_title), state.title)
         assertEquals(stringRes(R.string.chooseHWWallet_subtitle), state.subtitle)
-        assertEquals(
-            listOf(
-                imageRes(R.drawable.img_hw_wallet_keystone),
-                imageRes(R.drawable.img_hw_wallet_ledger),
-                imageRes(R.drawable.img_hw_wallet_leekwallet)
-            ),
-            state.cards.map { it.image }
-        )
-        assertEquals(
-            listOf(
-                stringRes(R.string.accounts_keystone),
-                stringRes(R.string.accounts_ledger),
-                stringRes(R.string.accounts_leekwallet)
-            ),
-            state.cards.map { it.contentDescription }
-        )
+        assertEquals(listOf(imageRes(R.drawable.img_hw_wallet_leekwallet)), state.cards.map { it.image })
+        assertEquals(listOf(stringRes(R.string.accounts_leekwallet)), state.cards.map { it.contentDescription })
     }
 
     @Test
-    fun eachCardRoutesToItsVendorConnectFlow() {
-        val navigationRouter = mockk<NavigationRouter>(relaxed = true)
-        val ledgerNavigator = mockk<LedgerNavigator>(relaxed = true)
-        val vm = vm(accounts = emptyList(), navigationRouter = navigationRouter, ledgerNavigator = ledgerNavigator)
+    fun theCardRoutesToTheLeekWalletConnectFlow() {
+        val leekWalletNavigator = mockk<LeekWalletNavigator>(relaxed = true)
+        val vm = vm(accounts = emptyList(), leekWalletNavigator = leekWalletNavigator)
 
         vm.state.value.cards
-            .first { it.testTag == ChooseHWWalletTag.KEYSTONE_CARD }
-            .onClick()
-        vm.state.value.cards
-            .first { it.testTag == ChooseHWWalletTag.LEDGER_CARD }
+            .single()
             .onClick()
 
-        verify(exactly = 1) { navigationRouter.forward(ConnectKeystoneArgs) }
-        verify(exactly = 1) { ledgerNavigator.forwardToConnect() }
+        verify(exactly = 1) { leekWalletNavigator.forwardToConnect() }
     }
 
     private fun vm(
         accounts: List<WalletAccount>?,
-        navigationRouter: NavigationRouter = mockk(relaxed = true),
-        ledgerNavigator: LedgerNavigator = mockk(relaxed = true),
+        leekWalletNavigator: LeekWalletNavigator = mockk(relaxed = true),
     ): ChooseHWWalletVM {
         val getWalletAccounts =
             mockk<GetWalletAccountsUseCase> {
@@ -164,14 +115,9 @@ class ChooseHWWalletVMTest {
             }
         return ChooseHWWalletVM(
             getWalletAccounts = getWalletAccounts,
-            navigationRouter = navigationRouter,
-            ledgerNavigator = ledgerNavigator,
-            leekWalletNavigator = mockk(relaxed = true),
+            navigationRouter = mockk(relaxed = true),
+            leekWalletNavigator = leekWalletNavigator,
         )
-    }
-
-    private companion object {
-        const val LEEKWALLET_CARD = "LEEKWALLET_CARD"
     }
 
     private fun keystoneAccount() =

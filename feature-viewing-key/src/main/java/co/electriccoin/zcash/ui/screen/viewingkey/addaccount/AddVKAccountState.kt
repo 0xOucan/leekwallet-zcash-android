@@ -10,7 +10,7 @@ import co.electriccoin.zcash.viewingkey.R
 
 /**
  * The "Add Account" options sheet, drawn by the Wallet Options sheet's view: connecting a hardware
- * wallet while a vendor is still unconnected, and importing a full viewing key.
+ * wallet while no LeekWallet is connected, and importing a full viewing key.
  */
 internal fun WalletOptionsState.Companion.addAccount(
     canConnectHardwareWallet: Boolean,

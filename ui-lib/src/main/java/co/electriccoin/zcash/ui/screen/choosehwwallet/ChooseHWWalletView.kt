@@ -145,10 +145,3 @@ private fun Preview() =
     ZcashTheme {
         ChooseHWWalletView(state = ChooseHWWalletState.preview)
     }
-
-@PreviewScreens
-@Composable
-private fun LedgerOnlyPreview() =
-    ZcashTheme {
-        ChooseHWWalletView(state = ChooseHWWalletState.previewLedgerOnly)
-    }

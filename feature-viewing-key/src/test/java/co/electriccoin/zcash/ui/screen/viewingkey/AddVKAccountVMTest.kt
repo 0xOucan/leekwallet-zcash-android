@@ -34,8 +34,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 /**
- * The "Add Account" sheet offers a hardware wallet only while a vendor is unconnected, always offers
- * the viewing key import, and hides itself before its choice replaces it.
+ * The "Add Account" sheet offers a hardware wallet only while no LeekWallet is connected, always
+ * offers the viewing key import, and hides itself before its choice replaces it.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AddVKAccountVMTest {
@@ -52,7 +52,7 @@ class AddVKAccountVMTest {
     }
 
     @Test
-    fun bothOptionsShowWhileAVendorIsUnconnected() =
+    fun bothOptionsShowWhileNoLeekWalletIsConnected() =
         runTest {
             val vm = vm(listOf(mockk<ZodlAccount>(), keystone(), mockk<ViewOnlyAccount>()))
             collect(vm)
@@ -64,9 +64,9 @@ class AddVKAccountVMTest {
         }
 
     @Test
-    fun onlyTheImportShowsOnceEveryVendorIsConnected() =
+    fun onlyTheImportShowsOnceALeekWalletIsConnected() =
         runTest {
-            val vm = vm(listOf(mockk<ZodlAccount>(), keystone(), mockk<LedgerAccount>(), leekWallet()))
+            val vm = vm(listOf(mockk<ZodlAccount>(), leekWallet()))
             collect(vm)
 
             assertEquals(
@@ -76,21 +76,9 @@ class AddVKAccountVMTest {
         }
 
     @Test
-    fun twoAccountsOfOneVendorStillLeaveTheOtherVendorToConnect() =
+    fun keystoneAndLedgerAccountsStillLeaveALeekWalletToConnect() =
         runTest {
-            val vm = vm(listOf(mockk<ZodlAccount>(), keystone(), keystone()))
-            collect(vm)
-
-            assertEquals(
-                listOf(AddVKAccountTag.CONNECT_HARDWARE_WALLET, AddVKAccountTag.IMPORT_VIEWING_KEY),
-                assertNotNull(vm.state.value).options.map { it.testTag }
-            )
-        }
-
-    @Test
-    fun aLeekWalletStillLeavesKeystoneAndLedgerToConnect() =
-        runTest {
-            val vm = vm(listOf(mockk<ZodlAccount>(), leekWallet()))
+            val vm = vm(listOf(mockk<ZodlAccount>(), keystone(), mockk<LedgerAccount>()))
             collect(vm)
 
             assertEquals(

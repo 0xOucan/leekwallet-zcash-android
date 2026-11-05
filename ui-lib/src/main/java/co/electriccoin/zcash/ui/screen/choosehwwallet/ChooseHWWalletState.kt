@@ -21,15 +21,9 @@ data class ChooseHWWalletState(
                         "Which hardware wallet would you like to connect? " +
                             "Select your device to get started."
                     ),
-                cards =
-                    listOf(
-                        HWWalletCardState.previewKeystone,
-                        HWWalletCardState.previewLedger,
-                    ),
+                cards = listOf(HWWalletCardState.previewLeekWallet),
                 onBack = {},
             )
-
-        val previewLedgerOnly = preview.copy(cards = listOf(HWWalletCardState.previewLedger))
     }
 }
 
@@ -43,19 +37,11 @@ data class HWWalletCardState(
     val onClick: () -> Unit,
 ) {
     companion object {
-        val previewKeystone =
+        val previewLeekWallet =
             HWWalletCardState(
-                image = imageRes(R.drawable.img_hw_wallet_keystone),
-                contentDescription = stringRes("Keystone"),
-                testTag = ChooseHWWalletTag.KEYSTONE_CARD,
-                onClick = {},
-            )
-
-        val previewLedger =
-            HWWalletCardState(
-                image = imageRes(R.drawable.img_hw_wallet_ledger),
-                contentDescription = stringRes("Ledger"),
-                testTag = ChooseHWWalletTag.LEDGER_CARD,
+                image = imageRes(R.drawable.img_hw_wallet_leekwallet),
+                contentDescription = stringRes("LeekWallet"),
+                testTag = ChooseHWWalletTag.LEEKWALLET_CARD,
                 onClick = {},
             )
     }

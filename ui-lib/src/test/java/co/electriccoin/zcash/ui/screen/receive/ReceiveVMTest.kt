@@ -93,6 +93,7 @@ class ReceiveVMTest {
                 copyToClipboard = mockk(relaxed = true),
                 navigationRouter = mockk(relaxed = true),
                 navigateToRequestZec = mockk(relaxed = true),
+                leekWalletNavigator = mockk(relaxed = true),
                 viewOnlyContent =
                     mockk<ViewOnlyContent> {
                         every { receiveShieldedTitle } returns VIEW_ONLY_SHIELDED

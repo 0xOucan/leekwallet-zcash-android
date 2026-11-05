@@ -210,6 +210,13 @@ private class FakeAccountDataSource(
         birthday: BlockHeight?
     ): cash.z.ecc.android.sdk.model.Account = error("unsupported")
 
+    override suspend fun importLeekWalletAccount(
+        ufvk: String,
+        seedFingerprint: String,
+        index: Long,
+        birthday: BlockHeight?
+    ): cash.z.ecc.android.sdk.model.Account = error("unsupported")
+
     override suspend fun importViewOnlyAccount(
         ufvk: String,
         name: String,

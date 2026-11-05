@@ -213,6 +213,13 @@ private class FakeAccountDataSource(
         birthday: BlockHeight?
     ): Account = unsupported()
 
+    override suspend fun importLeekWalletAccount(
+        ufvk: String,
+        seedFingerprint: String,
+        index: Long,
+        birthday: BlockHeight?
+    ): Account = unsupported()
+
     override suspend fun importLedgerAccount(
         pairing: LedgerAccountPairing,
         birthday: BlockHeight?

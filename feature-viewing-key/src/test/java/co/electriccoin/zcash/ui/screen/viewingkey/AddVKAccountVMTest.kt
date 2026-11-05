@@ -54,7 +54,7 @@ class AddVKAccountVMTest {
     @Test
     fun bothOptionsShowWhileAVendorIsUnconnected() =
         runTest {
-            val vm = vm(listOf(mockk<ZodlAccount>(), mockk<KeystoneAccount>(), mockk<ViewOnlyAccount>()))
+            val vm = vm(listOf(mockk<ZodlAccount>(), keystone(), mockk<ViewOnlyAccount>()))
             collect(vm)
 
             assertEquals(
@@ -66,7 +66,7 @@ class AddVKAccountVMTest {
     @Test
     fun onlyTheImportShowsOnceEveryVendorIsConnected() =
         runTest {
-            val vm = vm(listOf(mockk<ZodlAccount>(), mockk<KeystoneAccount>(), mockk<LedgerAccount>()))
+            val vm = vm(listOf(mockk<ZodlAccount>(), keystone(), mockk<LedgerAccount>(), leekWallet()))
             collect(vm)
 
             assertEquals(
@@ -78,7 +78,19 @@ class AddVKAccountVMTest {
     @Test
     fun twoAccountsOfOneVendorStillLeaveTheOtherVendorToConnect() =
         runTest {
-            val vm = vm(listOf(mockk<ZodlAccount>(), mockk<KeystoneAccount>(), mockk<KeystoneAccount>()))
+            val vm = vm(listOf(mockk<ZodlAccount>(), keystone(), keystone()))
+            collect(vm)
+
+            assertEquals(
+                listOf(AddVKAccountTag.CONNECT_HARDWARE_WALLET, AddVKAccountTag.IMPORT_VIEWING_KEY),
+                assertNotNull(vm.state.value).options.map { it.testTag }
+            )
+        }
+
+    @Test
+    fun aLeekWalletStillLeavesKeystoneAndLedgerToConnect() =
+        runTest {
+            val vm = vm(listOf(mockk<ZodlAccount>(), leekWallet()))
             collect(vm)
 
             assertEquals(
@@ -137,6 +149,10 @@ class AddVKAccountVMTest {
 
             verify(exactly = 1) { navigationRouter.back() }
         }
+
+    private fun keystone() = mockk<KeystoneAccount> { every { isLeekWallet } returns false }
+
+    private fun leekWallet() = mockk<KeystoneAccount> { every { isLeekWallet } returns true }
 
     private fun vm(accounts: List<WalletAccount>?) =
         AddVKAccountVM(

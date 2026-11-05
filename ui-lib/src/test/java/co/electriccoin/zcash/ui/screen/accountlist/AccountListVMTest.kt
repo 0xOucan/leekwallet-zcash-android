@@ -6,6 +6,7 @@ import cash.z.ecc.android.sdk.model.WalletBalance
 import cash.z.ecc.android.sdk.model.Zatoshi
 import cash.z.ecc.android.sdk.model.Zip32AccountIndex
 import co.electriccoin.zcash.ui.NavigationRouter
+import co.electriccoin.zcash.ui.common.leekwallet.LEEKWALLET_KEY_SOURCE
 import co.electriccoin.zcash.ui.common.model.KeystoneAccount
 import co.electriccoin.zcash.ui.common.model.LedgerAccount
 import co.electriccoin.zcash.ui.common.model.ViewOnlyAccount
@@ -423,6 +424,43 @@ class AccountListVMTest {
                 navigationRouter.forward(EditAccountArgs(viewOnly.sdkAccount.accountUuid.toStorageKeyId()))
             }
             coVerify(exactly = 0) { selectWalletAccount.invoke(any(), any()) }
+        }
+
+    @Test
+    fun aLeekWalletHasItsOwnSectionBetweenKeystoneAndLedgerAndNoKeystonePromo() =
+        runTest {
+            val leekWallet =
+                keystone(id = 3, isSelected = false).copy(
+                    sdkAccount =
+                        mockk {
+                            every { accountUuid } returns EditAccountFixtures.sdkAccount(3).accountUuid
+                            every { keySource } returns LEEKWALLET_KEY_SOURCE
+                        }
+                )
+            val vm =
+                vm(
+                    listOf(
+                        zodl(id = 1, isSelected = true),
+                        ledger(id = 4, isSelected = false),
+                        leekWallet,
+                        keystone(id = 2, isSelected = false),
+                    )
+                )
+            collect(vm)
+
+            assertEquals(
+                listOf(
+                    stringRes(UiR.string.hwWallet_section_zodl),
+                    stringRes(UiR.string.hwWallet_section_keystone),
+                    stringRes(UiR.string.accounts_leekwallet),
+                    stringRes(UiR.string.hwWallet_section_ledger),
+                ),
+                assertNotNull(vm.state.value.sections).map { it.title }
+            )
+
+            val onlyLeekWallet = vm(listOf(zodl(id = 1, isSelected = true), leekWallet))
+            collect(onlyLeekWallet)
+            assertNull(onlyLeekWallet.state.value.keystonePromo)
         }
 
     @Test

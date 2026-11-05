@@ -6,9 +6,11 @@ import cash.z.ecc.android.sdk.model.Zip32AccountIndex
 import co.electriccoin.zcash.ui.NavigationRouter
 import co.electriccoin.zcash.ui.R
 import co.electriccoin.zcash.ui.common.ledger.LedgerNavigator
+import co.electriccoin.zcash.ui.common.leekwallet.LEEKWALLET_KEY_SOURCE
 import co.electriccoin.zcash.ui.common.model.KeystoneAccount
 import co.electriccoin.zcash.ui.common.model.LedgerAccount
 import co.electriccoin.zcash.ui.common.model.WalletAccount
+import co.electriccoin.zcash.ui.common.model.canConnectHardwareWallet
 import co.electriccoin.zcash.ui.common.usecase.GetWalletAccountsUseCase
 import co.electriccoin.zcash.ui.design.util.imageRes
 import co.electriccoin.zcash.ui.design.util.stringRes
@@ -26,6 +28,8 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * The picker offers a vendor's card only while that vendor is unconnected, and each card routes to
@@ -88,6 +92,24 @@ class ChooseHWWalletVMTest {
             vm.state.value.cards
                 .map { it.testTag }
         )
+    }
+
+    @Test
+    fun aLeekWalletAccountHidesOnlyTheLeekWalletCard() {
+        val vm = vm(accounts = listOf(leekWalletAccount()))
+
+        assertEquals(
+            listOf(ChooseHWWalletTag.KEYSTONE_CARD, ChooseHWWalletTag.LEDGER_CARD),
+            vm.state.value.cards
+                .map { it.testTag }
+        )
+    }
+
+    @Test
+    fun aHardwareWalletCanStillBeConnectedUntilEveryVendorIs() {
+        assertTrue(listOf(keystoneAccount(), ledgerAccount()).canConnectHardwareWallet())
+        assertTrue(listOf(leekWalletAccount(), ledgerAccount()).canConnectHardwareWallet())
+        assertFalse(listOf(keystoneAccount(), ledgerAccount(), leekWalletAccount()).canConnectHardwareWallet())
     }
 
     @Test
@@ -161,6 +183,14 @@ class ChooseHWWalletVMTest {
             ironwoodBalance = null,
             transparentBalance = null,
             isSelected = false,
+        )
+
+    private fun leekWalletAccount() =
+        keystoneAccount().copy(
+            sdkAccount =
+                mockk {
+                    every { keySource } returns LEEKWALLET_KEY_SOURCE
+                }
         )
 
     private fun ledgerAccount() =

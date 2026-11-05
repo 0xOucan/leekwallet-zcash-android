@@ -24,6 +24,15 @@ object LeekDeviceNative {
     /** Returns once the device is unlocked (the user enters the PIN on the device). */
     external fun ensureUnlocked(handle: Long)
 
+    /** The board's firmware level; firmware that reports none counts as 1. Call after [pair]. */
+    external fun fwCompat(handle: Long): Int
+
+    /** A board at this [fwCompat] should be told to update. It can still sign. */
+    external fun firmwareOutdated(fwCompat: Int): Boolean
+
+    /** What to say when [firmwareOutdated] is true. */
+    external fun boardUpdateText(): String
+
     /**
      * zGetAccount as JSON: account, network, ufvk, ua, tAddress, seedFingerprint (hex), and
      * birthday when the device knows it.

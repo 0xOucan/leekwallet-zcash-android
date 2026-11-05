@@ -771,6 +771,7 @@
     <string name="send_viewTransaction">View Transaction</string>
     <string name="transaction_failedSend">Send Failed</string>
     <string name="send_failureInfo">There was an error attempting to send coins.\nTry it again, please.</string>
+    <string name="send_failureWrongConsensusBranchInfo">This transaction was built for network rules that have since changed, so it was not sent. Your funds did not move. Create it again and sign it.</string>
     <string name="send_confirmation_failure_anchor_subtitle">Your wallet\'s chain state changed while preparing this transaction. Please wait for sync to complete and try again.</string>
     <string name="send_confirmation_failure_grpc_title">Connection Issue</string>
     <string name="send_confirmation_failure_grpc_subtitle">Zodl encountered connection issues when submitting the

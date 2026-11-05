@@ -75,6 +75,15 @@ class LeekWalletDevice(
     private val mutableStatus = MutableStateFlow<LeekStatus>(LeekStatus.Idle)
     val status: StateFlow<LeekStatus> = mutableStatus.asStateFlow()
 
+    private val mutableBoardUpdate = MutableStateFlow<String?>(null)
+
+    /** A suggestion to update the board, once this session has read its firmware level. */
+    val boardUpdate: StateFlow<String?> = mutableBoardUpdate.asStateFlow()
+
+    /** The board's firmware level in this session; null when it could not be read. */
+    @Volatile
+    private var fwCompat: Int? = null
+
     private val prefs = context.getSharedPreferences("leekwallet_device", Context.MODE_PRIVATE)
 
     /** The link to use, remembered between sessions. */
@@ -96,7 +105,7 @@ class LeekWalletDevice(
     /** Account 0 of the device: what the app imports as a watch-only, device-signed account. */
     suspend fun readAccount(): LeekAccountInfo =
         session { h ->
-            mutableStatus.value = LeekStatus.ShareViewKey
+            mutableStatus.value = viewKeyStatus(fwCompat)
             val json = JSONObject(LeekDeviceNative.getAccount(h, ACCOUNT, networkName))
             LeekAccountInfo(
                 ufvk = json.getString("ufvk"),
@@ -133,11 +142,14 @@ class LeekWalletDevice(
 
     fun reset() {
         mutableStatus.value = LeekStatus.Idle
+        mutableBoardUpdate.value = null
     }
 
     private suspend fun <T> session(block: (Long) -> T): T =
         withContext(Dispatchers.IO) {
             mutableStatus.value = LeekStatus.Connecting
+            mutableBoardUpdate.value = null
+            fwCompat = null
             if (transport == LeekTransport.BLUETOOTH) {
                 LeekBleLink.scanAndConnect(context).use { link ->
                     return@withContext run(LeekDeviceNative.openBle(link), block)
@@ -162,9 +174,19 @@ class LeekWalletDevice(
             LeekDeviceNative.pair(handle) { mutableStatus.value = LeekStatus.ComparePasskey(it) }
             mutableStatus.value = LeekStatus.Unlock
             LeekDeviceNative.ensureUnlocked(handle)
+            readBoardStatus(handle)
             return block(handle)
         } finally {
             LeekDeviceNative.close(handle)
+        }
+    }
+
+    /** A suggestion only: when the level cannot be read, the operation still goes ahead. */
+    private fun readBoardStatus(handle: Long) {
+        val level = runCatching { LeekDeviceNative.fwCompat(handle) }.getOrNull() ?: return
+        fwCompat = level
+        if (LeekDeviceNative.firmwareOutdated(level)) {
+            mutableBoardUpdate.value = boardUpdateNotice(LeekDeviceNative.boardUpdateText())
         }
     }
 

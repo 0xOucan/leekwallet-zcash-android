@@ -63,6 +63,8 @@ data class LeekScreenState(
     val onStart: () -> Unit = {},
     val done: String? = null,
     val error: String? = null,
+    /** Suggests updating the board. Shown beside the rest, it never stops the operation. */
+    val boardUpdate: String? = null,
     val onRetry: (() -> Unit)? = null,
     val onClose: () -> Unit,
 )
@@ -168,6 +170,10 @@ private fun LeekView(state: LeekScreenState) {
                 state.error != null -> Message(state.error, ZashiColors.Text.textError)
                 state.done != null -> Message(state.done, ZashiColors.Text.textPrimary)
                 else -> StatusView(state.status)
+            }
+            if (state.boardUpdate != null && !state.idle && !state.scanning) {
+                Spacer(Modifier.height(16.dp))
+                Message(state.boardUpdate, ZashiColors.Text.textPrimary)
             }
             Spacer(Modifier.weight(1f))
             if (state.idle || state.error != null) {

@@ -3,6 +3,7 @@ package co.electriccoin.zcash.ui.screen.transactionprogress
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cash.z.ecc.android.sdk.exception.TransactionEncoderException
+import cash.z.ecc.android.sdk.model.TransactionSubmitResult
 import cash.z.ecc.sdk.ANDROID_STATE_FLOW_TIMEOUT
 import co.electriccoin.zcash.ui.R
 import co.electriccoin.zcash.ui.common.datasource.ExactInputSwapTransactionProposal
@@ -387,6 +388,11 @@ class TransactionProgressVM(
                         stringRes(R.string.send_confirmation_failure_anchor_subtitle)
                     }
 
+                    // Same on any proposal type: nothing was sent and only building it again helps.
+                    result.isWrongConsensusBranch() -> {
+                        stringRes(R.string.send_failureWrongConsensusBranchInfo)
+                    }
+
                     proposal is ExactInputSwapTransactionProposal -> {
                         stringRes(R.string.swapAndPay_failureSwapInfo)
                     }
@@ -461,6 +467,13 @@ internal fun SubmitResult.GrpcFailure.pendingDescription(): StyledStringResource
                 ?.let { stringRes(it).withStyle() }
         }
     }
+
+/**
+ * The SDK refused locally: the PCZT was built for the network rules before an upgrade and
+ * submitted after it, so no node would accept it.
+ */
+internal fun SubmitResult.NonResubmittableError.isWrongConsensusBranch(): Boolean =
+    (this as? SubmitResult.Failure)?.code == TransactionSubmitResult.Failure.CODE_WRONG_CONSENSUS_BRANCH
 
 // MOB-385 / MOB-1616: TransactionEncoderException.AnchorNotFoundException is the SDK's typed
 // signal for this failure (zodl-inc/zodl-android-wallet-sdk#26) — thrown directly from

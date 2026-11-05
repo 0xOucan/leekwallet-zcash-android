@@ -47,6 +47,7 @@ class LeekConnectVM(
 
     init {
         viewModelScope.launch { device.status.collect { s -> mutableState.update { it.copy(status = s) } } }
+        viewModelScope.launch { device.boardUpdate.collect { b -> mutableState.update { it.copy(boardUpdate = b) } } }
     }
 
     private fun setTransport(t: LeekTransport) {
@@ -135,6 +136,7 @@ class LeekSignVM(
 
     init {
         viewModelScope.launch { device.status.collect { s -> mutableState.update { it.copy(status = s) } } }
+        viewModelScope.launch { device.boardUpdate.collect { b -> mutableState.update { it.copy(boardUpdate = b) } } }
     }
 
     private fun setTransport(t: LeekTransport) {
@@ -284,6 +286,7 @@ class LeekVerifyVM(
 
     init {
         viewModelScope.launch { device.status.collect { s -> mutableState.update { it.copy(status = s) } } }
+        viewModelScope.launch { device.boardUpdate.collect { b -> mutableState.update { it.copy(boardUpdate = b) } } }
     }
 
     private fun setTransport(t: LeekTransport) {

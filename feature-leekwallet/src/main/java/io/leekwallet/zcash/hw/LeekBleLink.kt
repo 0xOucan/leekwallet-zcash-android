@@ -8,11 +8,11 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
+import android.bluetooth.BluetoothStatusCodes
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
-import android.bluetooth.BluetoothStatusCodes
 import android.content.Context
 import android.os.Build
 import android.os.ParcelUuid
@@ -39,7 +39,8 @@ class LeekBleLink private constructor(
     private val gatt: BluetoothGatt,
     private val rx: BluetoothGattCharacteristic,
     private val callback: Callback,
-) : FrameTransport, AutoCloseable {
+) : FrameTransport,
+    AutoCloseable {
     override fun send(bytes: ByteArray) {
         if (!connected) throw TransportFailure.Disconnected()
         sendFrame(bytes)

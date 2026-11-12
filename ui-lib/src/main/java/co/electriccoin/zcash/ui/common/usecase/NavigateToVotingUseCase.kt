@@ -27,22 +27,17 @@ class NavigateToVotingUseCase(
 ) {
     suspend operator fun invoke() {
         val selectedAccount = getSelectedWalletAccount()
-        if (selectedAccount is LedgerAccount) {
-            navigateToError(
-                ErrorArgs.General(AccountOperationUnsupportedException.ledger())
-            )
-            return
-        }
-        if (selectedAccount is KeystoneAccount && selectedAccount.isLeekWallet) {
-            navigateToError(ErrorArgs.General(AccountOperationUnsupportedException.leekWallet()))
-            return
-        }
-        if (!selectedAccount.isSpendable) {
-            navigateToError(
-                ErrorArgs.General(
-                    AccountOperationUnsupportedException.viewOnly()
-                )
-            )
+        val unsupported =
+            when {
+                selectedAccount is LedgerAccount -> AccountOperationUnsupportedException.ledger()
+                // The board does not sign governance ballots.
+                selectedAccount is KeystoneAccount && selectedAccount.isLeekWallet ->
+                    AccountOperationUnsupportedException.leekWallet()
+                !selectedAccount.isSpendable -> AccountOperationUnsupportedException.viewOnly()
+                else -> null
+            }
+        if (unsupported != null) {
+            navigateToError(ErrorArgs.General(unsupported))
             return
         }
         val isKeystone = selectedAccount is KeystoneAccount

@@ -63,10 +63,11 @@ internal suspend fun AccountDataSource.selectedLeekSigner(): LeekSigner {
     val account = getSelectedAccount()
     check(account is KeystoneAccount && account.isLeekWallet) { "The selected account is not a LeekWallet account." }
     val sdk = account.sdkAccount
+    val again = "import it again."
     return LeekSigner(
-        seedFingerprint = checkNotNull(sdk.seedFingerprint) { "This account has no seed fingerprint: import it again." },
-        index = checkNotNull(sdk.hdAccountIndex) { "This account has no account index: import it again." }.index.toUInt(),
-        ufvk = checkNotNull(sdk.ufvk) { "This account has no viewing key: import it again." },
+        seedFingerprint = checkNotNull(sdk.seedFingerprint) { "This account has no seed fingerprint: $again" },
+        index = checkNotNull(sdk.hdAccountIndex) { "This account has no account index: $again" }.index.toUInt(),
+        ufvk = checkNotNull(sdk.ufvk) { "This account has no viewing key: $again" },
     )
 }
 
@@ -179,8 +180,7 @@ class LeekViewKeyImportVM(
     }
 
     private fun onScanned(text: String) {
-        val s = scanner ?: return
-        if (!mutableState.value.scanning) return
+        val s = scanner?.takeIf { mutableState.value.scanning } ?: return
         val p = s.feed(text)
         when (p.state) {
             QrPartState.COMPLETE -> {
@@ -218,11 +218,16 @@ class LeekViewKeyImportVM(
                             }.onFailure { e -> mutableState.update { it.copy(error = e.leekMessage()) } }
                     }
             }
-            QrPartState.REFUSED ->
+
+            QrPartState.REFUSED -> {
                 mutableState.update {
                     it.copy(scanning = false, qrProgress = null, error = p.error ?: "This View key cannot be imported.")
                 }
-            else -> mutableState.update { it.copy(qrProgress = p.label() ?: it.qrProgress) }
+            }
+
+            else -> {
+                mutableState.update { it.copy(qrProgress = p.label() ?: it.qrProgress) }
+            }
         }
     }
 
@@ -373,8 +378,7 @@ class LeekSignVM(
     }
 
     private fun onScanned(text: String) {
-        val s = scanner ?: return
-        if (!mutableState.value.scanning) return
+        val s = scanner?.takeIf { mutableState.value.scanning } ?: return
         val p = s.feed(text)
         when (p.state) {
             QrPartState.COMPLETE -> {
@@ -390,11 +394,16 @@ class LeekSignVM(
                         }.onFailure { e -> mutableState.update { it.copy(error = e.leekMessage()) } }
                     }
             }
-            QrPartState.REFUSED ->
+
+            QrPartState.REFUSED -> {
                 mutableState.update {
                     it.copy(scanning = false, qrPart = null, error = p.error ?: "The signature QR could not be used.")
                 }
-            else -> mutableState.update { it.copy(qrProgress = p.label() ?: it.qrProgress) }
+            }
+
+            else -> {
+                mutableState.update { it.copy(qrProgress = p.label() ?: it.qrProgress) }
+            }
         }
     }
 
@@ -447,26 +456,33 @@ class LeekVerifyVM(
                         device.reset()
                         mutableState.update {
                             when (check) {
-                                AddressCheck.VERIFIED ->
+                                AddressCheck.VERIFIED -> {
                                     it.copy(done = "The device confirmed this address. It is your LeekWallet's.")
-                                AddressCheck.REJECTED ->
+                                }
+
+                                AddressCheck.REJECTED -> {
                                     it.copy(
                                         error =
                                             "You answered on the device that the addresses differ. Do not use " +
                                                 "this address until they match."
                                     )
-                                AddressCheck.NOT_OURS ->
+                                }
+
+                                AddressCheck.NOT_OURS -> {
                                     it.copy(
                                         error =
                                             "The device says this address is not one of its own. Do not use it: " +
                                                 "this account may not belong to the board you connected."
                                     )
-                                AddressCheck.UNSUPPORTED ->
+                                }
+
+                                AddressCheck.UNSUPPORTED -> {
                                     it.copy(
                                         error =
                                             "The board's firmware cannot show this address. Update the board " +
                                                 "to check it: zcash.leekwallet.xyz"
                                     )
+                                }
                             }
                         }
                     }.onFailure { e ->

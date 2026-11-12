@@ -22,7 +22,8 @@ class UsbSerialIo private constructor(
     private val dataInterface: UsbInterface,
     private val inEp: UsbEndpoint,
     private val outEp: UsbEndpoint,
-) : FrameTransport, AutoCloseable {
+) : FrameTransport,
+    AutoCloseable {
     private val buffer = ByteArray(inEp.maxPacketSize.coerceAtLeast(64) * 8)
 
     override fun send(bytes: ByteArray) {

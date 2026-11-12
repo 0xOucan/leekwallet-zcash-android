@@ -29,7 +29,7 @@ fun LeekBigQr(
     longest: Int
 ) {
     val config = LocalConfiguration.current
-    val side = min((config.screenWidthDp - 8).dp, (config.screenHeightDp * 0.62f).dp)
+    val side = min((config.screenWidthDp - SIDE_MARGIN_DP).dp, (config.screenHeightDp * HEIGHT_SHARE).dp)
     val version = remember(longest) { versionFor(longest) }
     val matrix =
         remember(text, version) {
@@ -71,3 +71,7 @@ private fun versionFor(length: Int): Int? {
 
 /** White modules round the code, on the black page. */
 private const val BORDER = 2
+
+/** Room left beside the code, and the share of the height it may take (the rest: tip and buttons). */
+private const val SIDE_MARGIN_DP = 8
+private const val HEIGHT_SHARE = 0.62f

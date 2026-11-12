@@ -178,7 +178,7 @@ class LeekWalletDevice(
     ): ByteArray =
         session { d ->
             val prepared = prepareForSigner(pczt, signer.ufvk, signer.seedFingerprint, signer.index)
-            d.signPczt(prepared, signer.meta(), view, true, signListener).signedPczt
+            d.signPczt(prepared, signer.meta(network), view, true, signListener).signedPczt
         }
 
     /**
@@ -190,7 +190,7 @@ class LeekWalletDevice(
         signer: LeekSigner
     ): LeekQrRequest {
         val prepared = prepareForSigner(pczt, signer.ufvk, signer.seedFingerprint, signer.index)
-        preflight(prepared, signer.meta(), null)
+        preflight(prepared, signer.meta(network), null)
         return LeekQrRequest(prepared, signerViewBytes(prepared, view))
     }
 
@@ -221,8 +221,6 @@ class LeekWalletDevice(
         mutableBoardUpdate.value = null
     }
 
-    private fun LeekSigner.meta() = AccountMeta(seedFingerprint, index, network, ufvk)
-
     /** Listeners run on the device thread: they only post state, and never throw. */
     private val pairingListener =
         object : PairingListener {
@@ -236,13 +234,22 @@ class LeekWalletDevice(
             override fun onProgress(progress: SignProgress) {
                 mutableStatus.value =
                     when (progress) {
-                        SignProgress.Checking -> LeekStatus.Working("Checking the transaction")
+                        SignProgress.Checking -> {
+                            LeekStatus.Working("Checking the transaction")
+                        }
+
                         is SignProgress.Uploading -> {
                             val pct = if (progress.total == 0uL) 0uL else progress.sent * 100uL / progress.total
                             LeekStatus.Working("Sending it to the device ($pct %)")
                         }
-                        SignProgress.ReviewOnDevice -> LeekStatus.ReviewOnDevice
-                        SignProgress.Applying -> LeekStatus.Working("Checking and applying the signatures")
+
+                        SignProgress.ReviewOnDevice -> {
+                            LeekStatus.ReviewOnDevice
+                        }
+
+                        SignProgress.Applying -> {
+                            LeekStatus.Working("Checking and applying the signatures")
+                        }
                     }
             }
         }
@@ -333,5 +340,7 @@ class LeekWalletDevice(
         private const val ACTION_USB_PERMISSION = "io.leekwallet.zcash.USB_PERMISSION"
     }
 }
+
+private fun LeekSigner.meta(network: Network) = AccountMeta(seedFingerprint, index, network, ufvk)
 
 internal fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }

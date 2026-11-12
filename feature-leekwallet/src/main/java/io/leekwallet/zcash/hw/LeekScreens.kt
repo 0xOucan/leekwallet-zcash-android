@@ -6,27 +6,27 @@ import android.content.ContextWrapper
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,7 +48,9 @@ data object LeekSignArgs
 
 /** Verify on the device that [ua] is the device's own address. */
 @kotlinx.serialization.Serializable
-data class LeekVerifyArgs(val ua: String)
+data class LeekVerifyArgs(
+    val ua: String
+)
 
 /** Import a board account from its View key QR (ur:leek-zcash-accounts), with no link. */
 @Serializable
@@ -111,7 +113,11 @@ fun LeekSignScreen() {
 
 @Composable
 fun LeekVerifyScreen(ua: String) {
-    val vm = koinViewModel<LeekVerifyVM> { org.koin.core.parameter.parametersOf(ua) }
+    val vm =
+        koinViewModel<LeekVerifyVM> {
+            org.koin.core.parameter
+                .parametersOf(ua)
+        }
     val state by vm.state.collectAsStateWithLifecycle()
     BackHandler { state.onClose() }
     LeekView(state)
@@ -136,13 +142,15 @@ private fun LeekView(state: LeekScreenState) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val permissionLauncher =
         androidx.activity.compose.rememberLauncherForActivityResult(
-            androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+            androidx.activity.result.contract.ActivityResultContracts
+                .RequestMultiplePermissions()
         ) { granted -> if (granted.values.all { it }) state.onStart() }
     val start = {
         val missing =
             state.transport == LeekTransport.BLUETOOTH &&
                 blePermissions.any {
-                    androidx.core.content.ContextCompat.checkSelfPermission(context, it) !=
+                    androidx.core.content.ContextCompat
+                        .checkSelfPermission(context, it) !=
                         android.content.pm.PackageManager.PERMISSION_GRANTED
                 }
         if (missing) permissionLauncher.launch(blePermissions) else state.onStart()
@@ -193,10 +201,22 @@ private fun LeekView(state: LeekScreenState) {
                     Spacer(Modifier.height(16.dp))
                     LeekCameraPermission { LeekQrScanner(onScanned = state.onScanned) }
                 }
-                state.idle -> Message(state.idleText ?: idleText(state.transport), null)
-                state.error != null -> Message(state.error, ZashiColors.Text.textError)
-                state.done != null -> Message(state.done, ZashiColors.Text.textPrimary)
-                else -> StatusView(state.status)
+
+                state.idle -> {
+                    Message(state.idleText ?: idleText(state.transport), null)
+                }
+
+                state.error != null -> {
+                    Message(state.error, ZashiColors.Text.textError)
+                }
+
+                state.done != null -> {
+                    Message(state.done, ZashiColors.Text.textPrimary)
+                }
+
+                else -> {
+                    StatusView(state.status)
+                }
             }
             if (state.boardUpdate != null && !state.idle && !state.scanning) {
                 Spacer(Modifier.height(16.dp))
@@ -241,22 +261,37 @@ private fun StatusView(status: LeekStatus) {
                 color = ZashiColors.Text.textPrimary,
             )
         }
-        LeekStatus.Unlock -> Busy("Enter your PIN on the device if it asks.")
-        LeekStatus.ReviewOnDevice ->
+
+        LeekStatus.Unlock -> {
+            Busy("Enter your PIN on the device if it asks.")
+        }
+
+        LeekStatus.ReviewOnDevice -> {
             Busy("Review the transaction on the device. Accept on its last page to sign.")
-        LeekStatus.ShareViewKey ->
+        }
+
+        LeekStatus.ShareViewKey -> {
             Busy(
                 "Confirm on the device to share this account's viewing key. It lets this phone " +
                     "see your balance and history, but not spend."
             )
-        is LeekStatus.Working -> Busy(status.what + "...")
-        LeekStatus.Connecting, LeekStatus.Idle -> Busy("Connecting to the LeekWallet...")
-        LeekStatus.CompareAddress ->
+        }
+
+        is LeekStatus.Working -> {
+            Busy(status.what + "...")
+        }
+
+        LeekStatus.Connecting, LeekStatus.Idle -> {
+            Busy("Connecting to the LeekWallet...")
+        }
+
+        LeekStatus.CompareAddress -> {
             Message(
                 "The device shows its address. Check it against the one on this phone's Receive " +
                     "screen, then confirm on the device.",
                 null
             )
+        }
     }
 }
 
@@ -280,27 +315,36 @@ private fun Message(
     )
 }
 
-
 private fun idleText(transport: LeekTransport): String =
     when (transport) {
-        LeekTransport.BLUETOOTH -> "On the device: Settings > Link > Bluetooth. Then press Start."
-        LeekTransport.QR ->
+        LeekTransport.BLUETOOTH -> {
+            "On the device: Settings > Link > Bluetooth. Then press Start."
+        }
+
+        LeekTransport.QR -> {
             "Press Start to show the transaction as an animated QR. On the device: Scan, and point its " +
                 "camera at this phone (3x zoom, about 30 cm away)."
-        LeekTransport.USB -> "Connect the LeekWallet's USB port with a USB-OTG cable. Then press Start."
+        }
+
+        LeekTransport.USB -> {
+            "Connect the LeekWallet's USB port with a USB-OTG cable. Then press Start."
+        }
     }
 
 /** Asks for the camera once, then shows [content]; the scanners need it. */
 @Composable
 private fun LeekCameraPermission(content: @Composable () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
+
     fun granted() =
-        androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) ==
+        androidx.core.content.ContextCompat
+            .checkSelfPermission(context, android.Manifest.permission.CAMERA) ==
             android.content.pm.PackageManager.PERMISSION_GRANTED
     var allowed by remember { mutableStateOf(granted()) }
     val launcher =
         androidx.activity.compose.rememberLauncherForActivityResult(
-            androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+            androidx.activity.result.contract.ActivityResultContracts
+                .RequestPermission()
         ) { allowed = it }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         if (!allowed) launcher.launch(android.Manifest.permission.CAMERA)

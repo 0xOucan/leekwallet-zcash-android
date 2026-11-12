@@ -11,6 +11,7 @@ import io.leekwallet.zcash.sdk.TransportFailure
  * codes, so [BIG] is the default here. [SAFE] is the SDK's qrDefaults(), measured from a
  * computer screen at 2x.
  */
+@Suppress("MagicNumber") // the bench's measured settings, named by the entries
 enum class LeekQrPreset(
     val label: String,
     val fragmentLen: UInt,
@@ -51,10 +52,22 @@ internal fun Throwable.leekMessage(): String =
                 else -> reason
             }
         }
-        is TransportFailure.NotFound -> "No LeekWallet found."
-        is TransportFailure.PermissionDenied -> "Permission to reach the LeekWallet was refused."
-        is TransportFailure -> "The link to the LeekWallet dropped."
-        else -> message ?: toString()
+
+        is TransportFailure.NotFound -> {
+            "No LeekWallet found."
+        }
+
+        is TransportFailure.PermissionDenied -> {
+            "Permission to reach the LeekWallet was refused."
+        }
+
+        is TransportFailure -> {
+            "The link to the LeekWallet dropped."
+        }
+
+        else -> {
+            message ?: toString()
+        }
     }
 
 private fun LeekException.reasonAndRecovery(): Pair<String, Recovery> =

@@ -27,6 +27,7 @@ class LeekWalletNavContributorImpl : LeekWalletNavContributor {
         with(navGraphBuilder) {
             composable<LeekConnectArgs> { LeekConnectScreen() }
             composable<LeekSignArgs> { LeekSignScreen() }
+            composable<LeekViewKeyImportArgs> { LeekViewKeyImportScreen() }
             composable<LeekVerifyArgs> { entry ->
                 LeekVerifyScreen(entry.toRoute<LeekVerifyArgs>().ua)
             }
@@ -37,9 +38,11 @@ class LeekWalletNavContributorImpl : LeekWalletNavContributor {
 val featureLeekWalletModule =
     module {
         single { LeekWalletDevice(androidContext()) }
+        factory { LeekAccountImporter(get(), get()) }
         single { LeekWalletNavigatorImpl(get()) } bind LeekWalletNavigator::class
         single { LeekWalletNavContributorImpl() } bind LeekWalletNavContributor::class
         viewModelOf(::LeekConnectVM)
         viewModelOf(::LeekSignVM)
-        viewModel { (ua: String) -> LeekVerifyVM(ua, get(), get()) }
+        viewModelOf(::LeekViewKeyImportVM)
+        viewModel { (ua: String) -> LeekVerifyVM(ua, get(), get(), get()) }
     }

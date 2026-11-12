@@ -1,6 +1,16 @@
 package io.leekwallet.zcash.hw
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +22,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -37,27 +50,38 @@ data object LeekSignArgs
 @kotlinx.serialization.Serializable
 data class LeekVerifyArgs(val ua: String)
 
-/** What either screen shows: a title, the device status, an error, and the buttons that apply. */
+/** Import a board account from its View key QR (ur:leek-zcash-accounts), with no link. */
+@Serializable
+data object LeekViewKeyImportArgs
+
+/** What every LeekWallet screen shows: a title, the device status, an error, the buttons that apply. */
 data class LeekScreenState(
     val title: String,
     val status: LeekStatus,
     val transport: LeekTransport = LeekTransport.USB,
     val transports: List<LeekTransport> = listOf(LeekTransport.USB, LeekTransport.BLUETOOTH),
+    /** What to say before Start; null: the link's own instructions. */
+    val idleText: String? = null,
     /** QR mode: the frame to show the device, or null. */
     val qrPart: String? = null,
-    /** QR mode: true while the camera reads the device's signature QR. */
+    /** QR mode: the longest frame of the request, so the code keeps one size as it animates. */
+    val qrLongest: Int = 0,
+    /** True while the camera reads the device's QR. */
     val scanning: Boolean = false,
+    val scanText: String = "",
+    /** "12/40 parts (30 %)" while a scan is under way. */
+    val qrProgress: String? = null,
     val onScanned: (String) -> Unit = {},
     val onScanSignature: () -> Unit = {},
-    /** QR mode: bytes per fragment and milliseconds per frame, and steppers for them. */
-    val qrFragment: Int = 50,
-    val qrFrameMs: Long = 500,
-    val onQrFragment: () -> Unit = {},
-    val onQrSpeed: () -> Unit = {},
+    /** QR mode: the speed preset (bytes per fragment, ms per frame). */
+    val qrPreset: LeekQrPreset = LeekQrPreset.DEFAULT,
+    val onQrPreset: (LeekQrPreset) -> Unit = {},
     val onTransport: (LeekTransport) -> Unit = {},
     /** Signing: whether the device gets the compact PCZT, and a toggle; null hides it. */
     val compactPczt: Boolean? = null,
     val onCompactPczt: () -> Unit = {},
+    /** Connect: import from the board's View key QR instead; null hides it. */
+    val onViewKeyQr: (() -> Unit)? = null,
     /** True until the first attempt starts: the user picks the link, then presses Start. */
     val idle: Boolean = true,
     val onStart: () -> Unit = {},
@@ -88,6 +112,14 @@ fun LeekSignScreen() {
 @Composable
 fun LeekVerifyScreen(ua: String) {
     val vm = koinViewModel<LeekVerifyVM> { org.koin.core.parameter.parametersOf(ua) }
+    val state by vm.state.collectAsStateWithLifecycle()
+    BackHandler { state.onClose() }
+    LeekView(state)
+}
+
+@Composable
+fun LeekViewKeyImportScreen() {
+    val vm = koinViewModel<LeekViewKeyImportVM>()
     val state by vm.state.collectAsStateWithLifecycle()
     BackHandler { state.onClose() }
     LeekView(state)
@@ -144,7 +176,7 @@ private fun LeekView(state: LeekScreenState) {
                     )
                 }
             }
-            if (state.compactPczt != null) {
+            if (state.compactPczt != null && state.transport != LeekTransport.QR) {
                 Spacer(Modifier.height(8.dp))
                 ZashiButton(
                     text = if (state.compactPczt) "PCZT: compact" else "PCZT: full",
@@ -155,18 +187,13 @@ private fun LeekView(state: LeekScreenState) {
             Spacer(Modifier.height(24.dp))
             when {
                 state.scanning -> {
-                    Message("Point the camera at the signature QR on the device.", null)
+                    Message(state.scanText, null)
+                    Spacer(Modifier.height(8.dp))
+                    Message(state.qrProgress ?: "Waiting for the first part...", ZashiColors.Text.textPrimary)
                     Spacer(Modifier.height(16.dp))
-                    LeekQrScanner(onScanned = state.onScanned)
+                    LeekCameraPermission { LeekQrScanner(onScanned = state.onScanned) }
                 }
-                state.idle -> Message(
-                    if (state.transport == LeekTransport.BLUETOOTH) {
-                        "On the device: Settings > Link > Bluetooth. Then press Start."
-                    } else {
-                        "Connect the LeekWallet's USB port with a USB-OTG cable. Then press Start."
-                    },
-                    null
-                )
+                state.idle -> Message(state.idleText ?: idleText(state.transport), null)
                 state.error != null -> Message(state.error, ZashiColors.Text.textError)
                 state.done != null -> Message(state.done, ZashiColors.Text.textPrimary)
                 else -> StatusView(state.status)
@@ -176,6 +203,14 @@ private fun LeekView(state: LeekScreenState) {
                 Message(state.boardUpdate, ZashiColors.Text.textPrimary)
             }
             Spacer(Modifier.weight(1f))
+            if (state.onViewKeyQr != null && (state.idle || state.error != null)) {
+                ZashiButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = "No cable: import from the View key QR",
+                    onClick = state.onViewKeyQr,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
             if (state.idle || state.error != null) {
                 ZashiButton(
                     modifier = Modifier.fillMaxWidth(),
@@ -246,29 +281,123 @@ private fun Message(
 }
 
 
-/** QR mode, showing the PCZT: the code as large as the screen allows, and the few controls. */
+private fun idleText(transport: LeekTransport): String =
+    when (transport) {
+        LeekTransport.BLUETOOTH -> "On the device: Settings > Link > Bluetooth. Then press Start."
+        LeekTransport.QR ->
+            "Press Start to show the transaction as an animated QR. On the device: Scan, and point its " +
+                "camera at this phone (3x zoom, about 30 cm away)."
+        LeekTransport.USB -> "Connect the LeekWallet's USB port with a USB-OTG cable. Then press Start."
+    }
+
+/** Asks for the camera once, then shows [content]; the scanners need it. */
+@Composable
+private fun LeekCameraPermission(content: @Composable () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    fun granted() =
+        androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+    var allowed by remember { mutableStateOf(granted()) }
+    val launcher =
+        androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+        ) { allowed = it }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (!allowed) launcher.launch(android.Manifest.permission.CAMERA)
+    }
+    if (allowed) {
+        content()
+    } else {
+        Message("Allow the camera to read the board's QR.", ZashiColors.Text.textError)
+    }
+}
+
+/**
+ * QR mode, showing the PCZT: a black page with the code as large as the window allows, the
+ * window at full brightness and kept on while it shows (both restored after), the presets and
+ * the phone tip.
+ */
 @Composable
 private fun LeekQrSendView(state: LeekScreenState) {
-    BlankBgScaffold { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().scaffoldPadding(padding),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = "On the device: Scan, and point its camera here. Accept on its last page, then Scan signature.",
-                style = ZashiTypography.textSm,
-                color = ZashiColors.Text.textTertiary,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(8.dp))
-            LeekBigQr(state.qrPart.orEmpty())
-            Spacer(Modifier.weight(1f))
-            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ZashiButton(text = "${state.qrFragment} B", onClick = state.onQrFragment)
-                ZashiButton(text = "${state.qrFrameMs} ms", onClick = state.onQrSpeed)
-                ZashiButton(text = "Scan signature", onClick = state.onScanSignature)
-                ZashiButton(text = "Cancel", onClick = state.onClose)
+    LeekFullBrightness()
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .systemBarsPadding()
+                .padding(horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.weight(1f))
+        LeekBigQr(state.qrPart.orEmpty(), state.qrLongest)
+        Spacer(Modifier.weight(1f))
+        Text(
+            text = "On the device: Scan, and point its camera here. Accept on its last page, then Scan signature.",
+            style = ZashiTypography.textSm,
+            color = Color.White,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = LEEK_QR_TIP,
+            style = ZashiTypography.textXs,
+            color = Color.LightGray,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            LeekQrPreset.entries.forEach { p ->
+                ZashiButton(
+                    text = if (p == state.qrPreset) "● ${p.label}" else p.label,
+                    onClick = { state.onQrPreset(p) },
+                )
+            }
+        }
+        Text(
+            text = state.qrPreset.detail,
+            style = ZashiTypography.textXs,
+            color = Color.LightGray,
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ZashiButton(text = "Scan signature", onClick = state.onScanSignature)
+            ZashiButton(text = "Cancel", onClick = state.onClose)
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+/**
+ * While composed: this window at full brightness and kept on, so the board's camera sees a bright,
+ * steady code. The previous brightness and keep-on flag come back when it leaves.
+ */
+@Composable
+private fun LeekFullBrightness() {
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val window = context.findActivity()?.window
+        val before = window?.attributes?.screenBrightness
+        val keptOn = window?.attributes?.flags?.and(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0
+        window?.let { w ->
+            w.attributes = w.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_FULL }
+            w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            window?.let { w ->
+                w.attributes =
+                    w.attributes.apply {
+                        screenBrightness = before ?: WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                    }
+                if (!keptOn) w.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
         }
     }
 }
+
+private tailrec fun Context.findActivity(): Activity? =
+    when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
+    }

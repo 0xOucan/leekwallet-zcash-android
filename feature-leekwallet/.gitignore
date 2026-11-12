@@ -1,3 +1,1 @@
 build/
-# Built by tools/leekwallet/build-native.sh from host/leek-android.
-src/main/jniLibs/

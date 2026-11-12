@@ -16,19 +16,12 @@ import android.bluetooth.BluetoothStatusCodes
 import android.content.Context
 import android.os.Build
 import android.os.ParcelUuid
+import io.leekwallet.zcash.sdk.FrameTransport
+import io.leekwallet.zcash.sdk.TransportFailure
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
-
-/** Whole protocol frames over a link that delimits them (Bluetooth LE). */
-interface BleIo {
-    /** One frame: big-endian u16 length (type included), type, payload. */
-    fun sendFrame(frame: ByteArray)
-
-    /** The next whole frame, or null when none arrived within [timeoutMs]. */
-    fun recvFrame(timeoutMs: Int): ByteArray?
-}
 
 /**
  * The LeekWallet board's GATT service (firmware src/ble.c, PROTOCOL.md 2): writes to RX carry
@@ -37,14 +30,32 @@ interface BleIo {
  * MTU - 4 bytes of the frame. The mirror of firmware ble-chunk.c.
  *
  * The board advertises only when its link is set to Bluetooth (Settings > Link on the device).
+ *
+ * A [FrameTransport] of kind FRAMES for the SDK's LeekDevice: each send and each recv is one whole
+ * frame (big-endian u16 length with the type byte, the type, the payload).
  */
 @SuppressLint("MissingPermission") // the screens hold BLUETOOTH_SCAN/CONNECT before calling
 class LeekBleLink private constructor(
     private val gatt: BluetoothGatt,
     private val rx: BluetoothGattCharacteristic,
     private val callback: Callback,
-) : BleIo, AutoCloseable {
-    override fun sendFrame(frame: ByteArray) {
+) : FrameTransport, AutoCloseable {
+    override fun send(bytes: ByteArray) {
+        if (!connected) throw TransportFailure.Disconnected()
+        sendFrame(bytes)
+    }
+
+    /** The next whole frame; empty when none arrived within [timeoutMs]. */
+    override fun recv(timeoutMs: UInt): ByteArray {
+        val frame = callback.frames.poll(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+        if (frame == null && !connected) throw TransportFailure.Disconnected()
+        return frame ?: EMPTY
+    }
+
+    private val connected: Boolean
+        get() = callback.linkUp
+
+    private fun sendFrame(frame: ByteArray) {
         val capacity = (callback.mtu - 3 - 1).coerceAtLeast(1)
         var offset = 0
         var seq = 0
@@ -55,8 +66,8 @@ class LeekBleLink private constructor(
             chunk[0] = ((if (more) 0x80 else 0) or (seq and 0x7f)).toByte()
             System.arraycopy(frame, offset, chunk, 1, take)
             callback.writeDone.clear()
-            check(writeChunk(chunk)) { "Bluetooth write refused" }
-            check(callback.writeDone.poll(WRITE_TIMEOUT_S, TimeUnit.SECONDS) == true) { "Bluetooth write failed" }
+            if (!writeChunk(chunk)) throw TransportFailure.Disconnected()
+            if (callback.writeDone.poll(WRITE_TIMEOUT_S, TimeUnit.SECONDS) != true) throw TransportFailure.Disconnected()
             offset += take
             seq++
         }
@@ -73,9 +84,6 @@ class LeekBleLink private constructor(
             gatt.writeCharacteristic(rx)
         }
 
-    override fun recvFrame(timeoutMs: Int): ByteArray? =
-        callback.frames.poll(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
-
     override fun close() {
         gatt.disconnect()
         gatt.close()
@@ -90,6 +98,9 @@ class LeekBleLink private constructor(
         val frames = LinkedBlockingQueue<ByteArray>()
 
         @Volatile var mtu = 23
+
+        /** False once the board drops the link, so reads stop waiting for it. */
+        @Volatile var linkUp = true
         private val assembling = ByteArrayOutputStream()
         private var nextSeq = 0
 
@@ -98,7 +109,9 @@ class LeekBleLink private constructor(
             status: Int,
             newState: Int
         ) {
-            connected.offer(status == BluetoothGatt.GATT_SUCCESS && newState == BluetoothProfile.STATE_CONNECTED)
+            val up = status == BluetoothGatt.GATT_SUCCESS && newState == BluetoothProfile.STATE_CONNECTED
+            if (!up) linkUp = false
+            connected.offer(up)
         }
 
         override fun onServicesDiscovered(
@@ -181,6 +194,7 @@ class LeekBleLink private constructor(
         private const val WRITE_TIMEOUT_S = 5L
         private const val STEP_TIMEOUT_S = 15L
         private const val WANTED_MTU = 517
+        private val EMPTY = ByteArray(0)
 
         /** Scan for the LeekWallet service, connect to the first board found, set the link up. */
         fun scanAndConnect(

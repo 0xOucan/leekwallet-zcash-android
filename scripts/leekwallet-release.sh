@@ -22,7 +22,7 @@
 #   LEEK_CERT_SHA256    expected signing certificate SHA-256 (default: the
 #                       project release key); abort on mismatch
 #   LEEK_HOST_DIR       the main repo's host/ (default: ../host)
-#   LEEK_SKIP_NATIVE=1  keep the libleek_android.so already in jniLibs
+#   LEEK_SKIP_NATIVE=1  keep the LeekWallet SDK already in leek-zcash-sdk/sdk
 #   LEEK_SKIP_GRADLE=1  sign and collect the APKs Gradle already built for this
 #                       commit (after a signing failure; refused if older)
 #   LEEK_ALLOW_SNAPSHOT=1  build even though a dependency is a -SNAPSHOT
@@ -142,19 +142,20 @@ mkdir -p "$OUT"
 [[ -z "$(ls -A "$OUT")" ]] || die "$OUT is not empty"
 
 # --- native library ----------------------------------------------------------
-SO_REL=feature-leekwallet/src/main/jniLibs/arm64-v8a/libleek_android.so
+# The LeekWallet SDK (host/leek-zcash-ffi): libleek_zcash_ffi.so and its Kotlin
+# bindings. build-ffi.sh refuses bindings that do not match the library.
+SO_REL=leek-zcash-sdk/sdk/jniLibs/arm64-v8a/libleek_zcash_ffi.so
 HOST_DIR="$(realpath -m "${LEEK_HOST_DIR:-$ROOT/../host}")"
 if [[ "${LEEK_SKIP_NATIVE:-}" != 1 ]]; then
-  note "native library (host/leek-android)"
+  note "LeekWallet SDK (host/leek-zcash-ffi)"
   [[ -f "$HOST_DIR/Cargo.toml" ]] || die "host/ not found at $HOST_DIR; set LEEK_HOST_DIR"
-  # Strip local paths from the binary so others can rebuild the same bytes.
-  RUSTFLAGS="${RUSTFLAGS:-} --remap-path-prefix=$HOST_DIR=/leek/host"
-  RUSTFLAGS+=" --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo"
-  RUSTFLAGS+=" --remap-path-prefix=${RUSTUP_HOME:-$HOME/.rustup}=/rustup"
-  export RUSTFLAGS
-  LEEK_HOST_DIR="$HOST_DIR" tools/leekwallet/build-native.sh --locked
+  LEEK_HOST_DIR="$HOST_DIR" ABIS=arm64-v8a tools/leekwallet/build-ffi.sh
 fi
-[[ -f "$SO_REL" ]] || die "$SO_REL missing; run tools/leekwallet/build-native.sh"
+[[ -f "$SO_REL" ]] || die "$SO_REL missing; run tools/leekwallet/build-ffi.sh"
+[[ -f leek-zcash-sdk/sdk/kotlin/io/leekwallet/zcash/sdk/leek_zcash_ffi.kt ]] ||
+  die "the SDK's Kotlin bindings are missing; run tools/leekwallet/build-ffi.sh"
+SDK_COMMIT="$(cat leek-zcash-sdk/sdk/SDK_COMMIT 2>/dev/null || echo '?')"
+[[ "$SDK_COMMIT" != *dirty* ]] || echo "warning: the SDK was built from a dirty host/ ($SDK_COMMIT)" >&2
 
 # --- build -------------------------------------------------------------------
 TASKS=(":app:assembleZcashmainnet${DIST_CAP}Release" ":app:assembleZcashtestnet${DIST_CAP}Release")
@@ -203,8 +204,10 @@ for net in mainnet testnet; do
 
   # No `grep -q` here: it exits at the first match, unzip then dies of SIGPIPE,
   # and pipefail turns a library that is there into a missing one.
-  unzip -Z1 "$OUT/$name" | grep -x "lib/arm64-v8a/libleek_android.so" >/dev/null ||
-    die "$name has no libleek_android.so"
+  unzip -Z1 "$OUT/$name" | grep -x "lib/arm64-v8a/libleek_zcash_ffi.so" >/dev/null ||
+    die "$name has no libleek_zcash_ffi.so"
+  unzip -Z1 "$OUT/$name" | grep -x "lib/arm64-v8a/libjnidispatch.so" >/dev/null ||
+    die "$name has no libjnidispatch.so (JNA)"
   if [[ -n "$AAPT2" ]]; then
     PKG[$net]="$("$AAPT2" dump packagename "$OUT/$name")"
   fi
@@ -239,10 +242,8 @@ fi
   echo "zodl base:       $UPSTREAM_VERSION"
   echo "zcash sdk:       $(prop ZCASH_SDK_VERSION)"
   echo "signing cert:    ${CERTS[0]:-unsigned}"
-  echo "libleek_android: $(sha256sum "$SO_REL" | cut -d' ' -f1)"
-  host_commit="$(git -C "$HOST_DIR" rev-parse HEAD 2>/dev/null || echo '?')"
-  [[ -z "$(git -C "$HOST_DIR" status --porcelain -- . 2>/dev/null)" ]] || host_commit+=" (dirty)"
-  echo "host commit:     $host_commit (leekwallet-zcash, host/leek-android)"
+  echo "leek_zcash_ffi:  $(sha256sum "$SO_REL" | cut -d' ' -f1)"
+  echo "host commit:     $SDK_COMMIT (leekwallet-zcash, host/leek-zcash-ffi)"
   echo "rustc:           $(rustc -V 2>/dev/null || echo '?')"
   echo "java:            $(java -version 2>&1 | head -n 1)"
   echo "gradle wrapper:  $(sed -n 's/^distributionUrl=.*gradle-\(.*\)-bin.zip/\1/p' gradle/wrapper/gradle-wrapper.properties)"

@@ -145,9 +145,10 @@ android {
             isShrinkResources = project.property("IS_MINIFY_ENABLED").toString().toBoolean()
             ndk {
                 debugSymbolLevel = project.property("NDK_DEBUG_SYMBOL_LEVEL").toString()
-                // LeekWallet: libleek_android.so (the board link) is built for
-                // arm64-v8a only; a 32-bit phone would install the app and fail to
-                // load it, so release APKs are 64-bit only.
+                // LeekWallet: libleek_zcash_ffi.so (the LeekWallet SDK, the board
+                // link) is built for 64-bit only; a 32-bit phone would install the
+                // app and fail to load it, so release APKs are arm64-v8a only. This
+                // also drops JNA's libjnidispatch.so for the other ABIs.
                 abiFilters.addAll(setOf("arm64-v8a"))
             }
 

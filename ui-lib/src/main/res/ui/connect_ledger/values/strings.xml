@@ -19,4 +19,6 @@
     <string name="accounts_ledger_shieldedAddress">Zcash Shielded Address</string>
     <string name="accounts_ledger_transparentAddress">Zcash Transparent Address</string>
 
+    <string name="leekwallet_unsupported_title">Not available</string>
+    <string name="leekwallet_voting_unsupported_message">Voting is not available for a LeekWallet account. The board signs sends and shielding, not governance ballots. To vote, select a Zodl account.</string>
 </resources>

@@ -4,41 +4,93 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cash.z.ecc.android.sdk.model.BlockHeight
 import cash.z.ecc.android.sdk.model.Pczt
-import cash.z.ecc.android.sdk.model.ZcashNetwork
-import cash.z.ecc.sdk.type.fromResources
 import co.electriccoin.zcash.ui.NavigationRouter
 import co.electriccoin.zcash.ui.common.datasource.AccountDataSource
 import co.electriccoin.zcash.ui.common.datasource.ShieldTransactionProposal
+import co.electriccoin.zcash.ui.common.model.KeystoneAccount
 import co.electriccoin.zcash.ui.common.provider.SynchronizerProvider
 import co.electriccoin.zcash.ui.common.repository.KeystoneProposalRepository
 import co.electriccoin.zcash.ui.common.usecase.SubmitKSProposalUseCase
+import io.leekwallet.zcash.sdk.AddressCheck
+import io.leekwallet.zcash.sdk.QrEncoder
+import io.leekwallet.zcash.sdk.QrPartState
+import io.leekwallet.zcash.sdk.QrScanKind
+import io.leekwallet.zcash.sdk.QrScanner
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/**
+ * Imports a board account watch-only (the board signs), selects it and restarts sync from its
+ * birthday: the same for the USB / Bluetooth import and the View key QR.
+ */
+class LeekAccountImporter(
+    private val accountDataSource: AccountDataSource,
+    private val synchronizerProvider: SynchronizerProvider,
+) {
+    suspend fun import(info: LeekAccountInfo) {
+        val account =
+            accountDataSource.importLeekWalletAccount(
+                ufvk = info.ufvk,
+                seedFingerprint = info.seedFingerprintHex,
+                index = info.index,
+                birthday = usableBirthday(info.birthday),
+            )
+        accountDataSource.selectAccount(account)
+        synchronizerProvider.resetSynchronizer()
+    }
+
+    /**
+     * The board keeps one birthday per account, whichever network it was recorded on. A height
+     * past this network's tip (a testnet birthday seen by the mainnet app: testnet is the
+     * longer chain) would hide every note, so it is dropped and the account scans from the start.
+     */
+    private suspend fun usableBirthday(height: Long?): BlockHeight? {
+        if (height == null) return null
+        val tip = synchronizerProvider.getSynchronizer().networkHeight.value
+        return if (tip != null && height > tip.value) null else BlockHeight.new(height)
+    }
+}
+
+/** The selected LeekWallet account as the SDK needs it to check and sign for it. */
+internal suspend fun AccountDataSource.selectedLeekSigner(): LeekSigner {
+    val account = getSelectedAccount()
+    check(account is KeystoneAccount && account.isLeekWallet) { "The selected account is not a LeekWallet account." }
+    val sdk = account.sdkAccount
+    val again = "import it again."
+    return LeekSigner(
+        seedFingerprint = checkNotNull(sdk.seedFingerprint) { "This account has no seed fingerprint: $again" },
+        index = checkNotNull(sdk.hdAccountIndex) { "This account has no account index: $again" }.index.toUInt(),
+        ufvk = checkNotNull(sdk.ufvk) { "This account has no viewing key: $again" },
+    )
+}
 
 /**
  * Connect: pair with the device, read its account 0, import it watch-only (the device signs),
- * select it and restart sync from the device's birthday.
+ * select it and restart sync from the device's birthday. Or, with no link at all, import it from
+ * the board's View key QR ([LeekViewKeyImportVM]).
  */
 class LeekConnectVM(
     private val device: LeekWalletDevice,
-    private val accountDataSource: AccountDataSource,
-    private val synchronizerProvider: SynchronizerProvider,
+    private val importer: LeekAccountImporter,
     private val navigationRouter: NavigationRouter,
-    private val context: android.content.Context,
 ) : ViewModel() {
     private val mutableState =
         MutableStateFlow(
             LeekScreenState(
                 title = "Connect LeekWallet",
                 status = LeekStatus.Idle,
-                transport = device.transport,
+                transport = device.transport.takeIf { it != LeekTransport.QR } ?: LeekTransport.USB,
                 onTransport = ::setTransport,
                 onStart = ::start,
                 onRetry = ::start,
+                onViewKeyQr = ::openViewKeyImport,
                 onClose = ::close
             )
         )
@@ -62,39 +114,27 @@ class LeekConnectVM(
             viewModelScope.launch {
                 runCatching {
                     val info = device.readAccount()
-                    val birthday = usableBirthday(info.birthday)
-                    val account =
-                        accountDataSource.importLeekWalletAccount(
-                            ufvk = info.ufvk,
-                            seedFingerprint = info.seedFingerprintHex,
-                            index = 0,
-                            birthday = birthday,
-                        )
-                    accountDataSource.selectAccount(account)
-                    synchronizerProvider.resetSynchronizer()
+                    importer.import(info)
                     info
                 }.onSuccess { info ->
                     mutableState.update {
                         it.copy(done = "LeekWallet connected.\n\n${info.ua}\n\nThe app watches this account; the device signs.")
                     }
                 }.onFailure { e ->
-                    mutableState.update { it.copy(error = e.message ?: e.toString()) }
+                    mutableState.update { it.copy(error = e.leekMessage()) }
                 }
             }
     }
 
-    /**
-     * The board keeps one birthday per account, whichever network it was recorded on. A height
-     * past this network's tip (a testnet birthday seen by the mainnet app: testnet is the
-     * longer chain) would hide every note, so it is dropped and the account scans from the start.
-     */
-    private suspend fun usableBirthday(height: Long?): BlockHeight? {
-        if (height == null) return null
-        val tip = synchronizerProvider.getSynchronizer().networkHeight.value
-        return if (tip != null && height > tip.value) null else BlockHeight.new(height)
+    private fun openViewKeyImport() {
+        device.cancel()
+        job?.cancel()
+        device.reset()
+        navigationRouter.forward(LeekViewKeyImportArgs)
     }
 
     private fun close() {
+        device.cancel()
         job?.cancel()
         device.reset()
         if (mutableState.value.done != null) navigationRouter.backToRoot() else navigationRouter.back()
@@ -102,12 +142,115 @@ class LeekConnectVM(
 }
 
 /**
+ * View key import: the camera reads the board's animated ur:leek-zcash-accounts (Main menu >
+ * View key on the board), and the account is imported as the USB import does it: its UFVK, the
+ * seed fingerprint, the account index and the birthday when the board knows it. A one-way
+ * export, not pairing: no link is opened and nothing goes to the board.
+ */
+class LeekViewKeyImportVM(
+    private val device: LeekWalletDevice,
+    private val importer: LeekAccountImporter,
+    private val navigationRouter: NavigationRouter,
+) : ViewModel() {
+    private val mutableState =
+        MutableStateFlow(
+            LeekScreenState(
+                title = "Import from View key",
+                status = LeekStatus.Idle,
+                transports = emptyList(),
+                idleText =
+                    "On the board: Main menu > View key. Then press Start and point this phone's " +
+                        "camera at the board's screen.",
+                scanText = "Point the camera at the View key QR on the board.",
+                onScanned = ::onScanned,
+                onStart = ::start,
+                onRetry = ::start,
+                onClose = ::close
+            )
+        )
+    val state: StateFlow<LeekScreenState> = mutableState.asStateFlow()
+    private var scanner: QrScanner? = null
+    private var job: Job? = null
+
+    private fun start() {
+        job?.cancel()
+        scanner?.close()
+        scanner = QrScanner(QrScanKind.ACCOUNT_RECORD, device.network)
+        mutableState.update { it.copy(error = null, done = null, idle = false, scanning = true, qrProgress = null) }
+    }
+
+    private fun onScanned(text: String) {
+        val s = scanner?.takeIf { mutableState.value.scanning } ?: return
+        val p = s.feed(text)
+        when (p.state) {
+            QrPartState.COMPLETE -> {
+                val record = s.accountRecord() ?: return
+                mutableState.update { it.copy(scanning = false, qrProgress = null) }
+                val entry = record.accounts.firstOrNull { it.index == 0u } ?: record.accounts.first()
+                val info =
+                    LeekAccountInfo(
+                        ufvk = entry.ufvk,
+                        ua = null,
+                        seedFingerprintHex = record.seedFingerprint.toHex(),
+                        index = entry.index.toLong(),
+                        birthday = entry.birthday?.toLong(),
+                    )
+                job =
+                    viewModelScope.launch {
+                        mutableState.update { it.copy(status = LeekStatus.Working("Importing the account")) }
+                        runCatching { importer.import(info) }
+                            .onSuccess {
+                                val more =
+                                    if (record.accounts.size > 1) {
+                                        "\n\nThe board shared ${record.accounts.size} accounts; account " +
+                                            "${entry.index} was imported."
+                                    } else {
+                                        ""
+                                    }
+                                mutableState.update {
+                                    it.copy(
+                                        done =
+                                            "LeekWallet account ${entry.index} imported from its View key. " +
+                                                "The app watches it; the board signs.$more\n\nCheck the " +
+                                                "address on the board: Receive > Verify on device.",
+                                    )
+                                }
+                            }.onFailure { e -> mutableState.update { it.copy(error = e.leekMessage()) } }
+                    }
+            }
+
+            QrPartState.REFUSED -> {
+                mutableState.update {
+                    it.copy(scanning = false, qrProgress = null, error = p.error ?: "This View key cannot be imported.")
+                }
+            }
+
+            else -> {
+                mutableState.update { it.copy(qrProgress = p.label() ?: it.qrProgress) }
+            }
+        }
+    }
+
+    override fun onCleared() {
+        scanner?.close()
+        scanner = null
+    }
+
+    private fun close() {
+        job?.cancel()
+        if (mutableState.value.done != null) navigationRouter.backToRoot() else navigationRouter.back()
+    }
+}
+
+/**
  * Sign: the signer view of the pending proposal goes to the device, the user reviews it there,
- * the device's signatures are applied, and the Keystone pipeline submits it (proofs were started
- * when the PCZT was created).
+ * the device's signatures are verified and applied, and the Keystone pipeline submits it (proofs
+ * were started when the PCZT was created). Over USB / Bluetooth the SDK's LeekDevice does it in
+ * one call; over QR the request is an animated ur:leek-pczt and the reply a ur:leek-zsig.
  */
 class LeekSignVM(
     private val device: LeekWalletDevice,
+    private val accountDataSource: AccountDataSource,
     private val keystoneProposalRepository: KeystoneProposalRepository,
     private val submitKSProposal: SubmitKSProposalUseCase,
     private val navigationRouter: NavigationRouter,
@@ -119,10 +262,13 @@ class LeekSignVM(
                 status = LeekStatus.Idle,
                 transport = device.transport,
                 transports = LeekTransport.entries,
+                scanText = "Point the camera at the signature QR on the device.",
                 onScanned = ::onScanned,
                 onScanSignature = ::onScanSignature,
-                onQrFragment = ::nextQrFragment,
-                onQrSpeed = ::nextQrSpeed,
+                qrPreset = device.qrPreset,
+                onQrPreset = ::setQrPreset,
+                qrBrightness = device.qrBrightness,
+                onQrBrightness = ::cycleQrBrightness,
                 onTransport = ::setTransport,
                 compactPczt = device.compactPczt,
                 onCompactPczt = ::toggleCompact,
@@ -149,23 +295,50 @@ class LeekSignVM(
         mutableState.update { it.copy(compactPczt = device.compactPczt) }
     }
 
+    private fun setQrPreset(p: LeekQrPreset) {
+        device.qrPreset = p
+        mutableState.update { it.copy(qrPreset = p) }
+    }
+
+    private fun cycleQrBrightness() {
+        val next = mutableState.value.qrBrightness.next()
+        device.qrBrightness = next
+        mutableState.update { it.copy(qrBrightness = next) }
+    }
+
     private fun start() {
+        device.cancel()
         job?.cancel()
-        mutableState.update { it.copy(error = null, idle = false, scanning = false, qrPart = null) }
+        scanner?.close()
+        scanner = null
+        qrRequest = null
+        mutableState.update {
+            it.copy(
+                error = null,
+                idle = false,
+                scanning = false,
+                qrPart = null,
+                qrProgress = null,
+                onShowCodeAgain = null
+            )
+        }
         job =
             viewModelScope.launch {
                 runCatching {
-                    val pczt = keystoneProposalRepository.createSignerPczt()
+                    val pczt = keystoneProposalRepository.createSignerPczt().toByteArray()
+                    val signer = accountDataSource.selectedLeekSigner()
                     if (device.transport == LeekTransport.QR) {
-                        showOverQr(pczt.toByteArray(), device.signerBytes(pczt.toByteArray()))
+                        val request = withContext(Dispatchers.Default) { device.qrRequest(pczt, signer) }
+                        qrRequest = request
+                        showOverQr(request.sent)
                         return@launch
                     }
-                    val signed = device.sign(pczt.toByteArray())
+                    val signed = device.sign(pczt, signer)
                     keystoneProposalRepository.setPcztWithSignatures(Pczt(signed))
                     device.reset()
                     submitKSProposal()
                 }.onFailure { e ->
-                    mutableState.update { it.copy(error = e.message ?: e.toString()) }
+                    mutableState.update { it.copy(error = e.leekMessage(), qrPart = null) }
                 }
             }
     }
@@ -176,6 +349,7 @@ class LeekSignVM(
      * nothing would ever drop this one: drop it here (as Keystone's reject does).
      */
     private fun close() {
+        device.cancel()
         job?.cancel()
         device.reset()
         if (keystoneProposalRepository.transactionProposal.value is ShieldTransactionProposal) {
@@ -186,80 +360,111 @@ class LeekSignVM(
 
     // ---- QR air gap: ur:leek-pczt out, ur:leek-zsig back (FORMATS.md) ----
 
-    private var qrPczt: ByteArray? = null
-    private var qrSent: ByteArray? = null
-    private var decoder = com.sparrowwallet.hummingbird.URDecoder()
+    private var qrRequest: LeekQrRequest? = null
+    private var scanner: QrScanner? = null
 
-    /** Animate [sent] (the view of [pczt] for the device) as ur:leek-pczt until the user scans. */
-    private suspend fun showOverQr(pczt: ByteArray, sent: ByteArray) {
-        qrPczt = pczt
-        qrSent = sent
-        val ur = com.sparrowwallet.hummingbird.UR.fromBytes(UR_PCZT, sent)
-        var fragment = 0
-        var encoder: com.sparrowwallet.hummingbird.UREncoder? = null
-        while (!mutableState.value.scanning) {
-            // A new fragment size is a new encoder: the device's decoder starts over on it.
-            val wanted = mutableState.value.qrFragment
-            if (encoder == null || wanted != fragment) {
-                fragment = wanted
-                encoder = com.sparrowwallet.hummingbird.UREncoder(ur, fragment, QR_MIN_FRAGMENT, 0)
+    /**
+     * Animates [sent] as ur:leek-pczt until the user switches to scanning the reply. A new preset
+     * is a new encoder: the board's decoder starts over on it. Every frame is uppercase (the QR
+     * alphanumeric mode) and at most longestFrame() characters, so the code keeps one size.
+     */
+    private suspend fun showOverQr(sent: ByteArray) {
+        var preset: LeekQrPreset? = null
+        var encoder: QrEncoder? = null
+        var index = 0uL
+        try {
+            while (!mutableState.value.scanning) {
+                val wanted = mutableState.value.qrPreset
+                if (encoder == null || wanted != preset) {
+                    encoder?.close()
+                    preset = wanted
+                    encoder = QrEncoder.pczt(sent, wanted.fragmentLen)
+                    index = 0uL
+                }
+                val frame = encoder.frame(index++)
+                val longest = encoder.longestFrame().toInt()
+                mutableState.update { it.copy(qrPart = frame, qrLongest = longest) }
+                delay(wanted.frameMs)
             }
-            // Upper case: QR alphanumeric mode, a third smaller; UR decoders, the device's
-            // included, read it case-insensitively.
-            mutableState.update { it.copy(qrPart = encoder.nextPart().uppercase()) }
-            kotlinx.coroutines.delay(mutableState.value.qrFrameMs)
-        }
-    }
-
-    /** As the LeekWallet companion offers them: smaller fragments are easier for the board. */
-    private fun nextQrFragment() {
-        mutableState.update { st: LeekScreenState ->
-            st.copy(qrFragment = QR_FRAGMENTS[(QR_FRAGMENTS.indexOf(st.qrFragment) + 1) % QR_FRAGMENTS.size])
-        }
-    }
-
-    private fun nextQrSpeed() {
-        mutableState.update { st: LeekScreenState ->
-            st.copy(qrFrameMs = QR_SPEEDS[(QR_SPEEDS.indexOf(st.qrFrameMs) + 1) % QR_SPEEDS.size])
+        } finally {
+            encoder?.close()
         }
     }
 
     private fun onScanSignature() {
-        decoder = com.sparrowwallet.hummingbird.URDecoder()
-        mutableState.update { it.copy(scanning = true) }
+        scanner?.close()
+        scanner = QrScanner(QrScanKind.ZSIG, null)
+        mutableState.update { it.copy(scanning = true, qrProgress = null, onShowCodeAgain = ::showCodeAgain) }
     }
 
-    private fun onScanned(part: String) {
-        val state = mutableState.value
-        if (!state.scanning) return
-        runCatching {
-            decoder.receivePart(part)
-            val result = decoder.result ?: return
-            check(result.type == com.sparrowwallet.hummingbird.ResultType.SUCCESS) { "The QR could not be read" }
-            check(result.ur.type == UR_ZSIG) { "Not a LeekWallet signature (ur:${result.ur.type})" }
-            val pczt = checkNotNull(qrPczt) { "No transaction is waiting for a signature" }
-            val sent = checkNotNull(qrSent) { "No transaction is waiting for a signature" }
-            val signed = PcztSignatures.applyTo(pczt, sent, result.ur.toBytes())
-            mutableState.update { it.copy(scanning = false, qrPart = null) }
-            job =
-                viewModelScope.launch {
-                    runCatching {
-                        keystoneProposalRepository.setPcztWithSignatures(Pczt(signed))
-                        submitKSProposal()
-                    }.onFailure { e -> mutableState.update { it.copy(error = e.message ?: e.toString()) } }
+    /**
+     * Back from Scan signature (or a signature QR that could not be used) to the same request:
+     * nothing new is built, so the board can scan it again or the user can rescan its reply.
+     */
+    private fun showCodeAgain() {
+        val request = qrRequest ?: return
+        job?.cancel()
+        scanner?.close()
+        scanner = null
+        mutableState.update {
+            it.copy(error = null, scanning = false, qrProgress = null, onShowCodeAgain = null)
+        }
+        job = viewModelScope.launch { showOverQr(request.sent) }
+    }
+
+    private fun onScanned(text: String) {
+        val s = scanner?.takeIf { mutableState.value.scanning } ?: return
+        val p = s.feed(text)
+        when (p.state) {
+            QrPartState.COMPLETE -> {
+                val zsig = s.zsig() ?: return
+                mutableState.update {
+                    it.copy(scanning = false, qrPart = null, qrProgress = null, onShowCodeAgain = null)
                 }
-        }.onFailure { e ->
-            decoder = com.sparrowwallet.hummingbird.URDecoder()
-            mutableState.update { it.copy(scanning = false, error = e.message ?: e.toString()) }
+                job =
+                    viewModelScope.launch {
+                        val request = qrRequest
+                        val signed =
+                            runCatching {
+                                checkNotNull(request) { "No transaction is waiting for a signature" }
+                                withContext(Dispatchers.Default) { device.applyQrSignature(request, zsig) }
+                            }.getOrElse { e ->
+                                // Nothing was applied: the same request can be shown again.
+                                mutableState.update {
+                                    it.copy(
+                                        error = e.leekMessage(),
+                                        onShowCodeAgain = if (request != null) ::showCodeAgain else null
+                                    )
+                                }
+                                return@launch
+                            }
+                        runCatching {
+                            keystoneProposalRepository.setPcztWithSignatures(Pczt(signed))
+                            submitKSProposal()
+                        }.onFailure { e -> mutableState.update { it.copy(error = e.leekMessage()) } }
+                    }
+            }
+
+            QrPartState.REFUSED -> {
+                mutableState.update {
+                    it.copy(
+                        scanning = false,
+                        qrPart = null,
+                        error = p.error ?: "The signature QR could not be used.",
+                        onShowCodeAgain = ::showCodeAgain
+                    )
+                }
+            }
+
+            else -> {
+                mutableState.update { it.copy(qrProgress = p.label() ?: it.qrProgress) }
+            }
         }
     }
 
-    private companion object {
-        const val UR_PCZT = "leek-pczt"
-        const val UR_ZSIG = "leek-zsig"
-        const val QR_MIN_FRAGMENT = 10
-        val QR_FRAGMENTS = listOf(50, 90, 150, 250)
-        val QR_SPEEDS = listOf(300L, 500L, 800L)
+    override fun onCleared() {
+        scanner?.close()
+        scanner = null
     }
 }
 
@@ -267,6 +472,7 @@ class LeekSignVM(
 class LeekVerifyVM(
     private val ua: String,
     private val device: LeekWalletDevice,
+    private val accountDataSource: AccountDataSource,
     private val navigationRouter: NavigationRouter,
 ) : ViewModel() {
     private val mutableState =
@@ -274,7 +480,7 @@ class LeekVerifyVM(
             LeekScreenState(
                 title = "Verify address on LeekWallet",
                 status = LeekStatus.Idle,
-                transport = device.transport,
+                transport = device.transport.takeIf { it != LeekTransport.QR } ?: LeekTransport.USB,
                 onTransport = ::setTransport,
                 onStart = ::start,
                 onRetry = ::start,
@@ -295,26 +501,84 @@ class LeekVerifyVM(
     }
 
     private fun start() {
+        device.cancel()
         job?.cancel()
         mutableState.update { it.copy(error = null, done = null, idle = false) }
         job =
             viewModelScope.launch {
-                runCatching { device.verifyAddress(ua) }
-                    .onSuccess {
+                runCatching { device.verifyAddress(ua, accountDataSource.selectedLeekSigner().index) }
+                    .onSuccess { check ->
                         device.reset()
                         mutableState.update {
-                            it.copy(done = "The device confirmed this address. It is your LeekWallet's.")
+                            when (check) {
+                                AddressCheck.VERIFIED -> {
+                                    it.copy(done = "The device confirmed this address. It is your LeekWallet's.")
+                                }
+
+                                AddressCheck.REJECTED -> {
+                                    it.copy(
+                                        error =
+                                            "You answered on the device that the addresses differ. Do not use " +
+                                                "this address until they match."
+                                    )
+                                }
+
+                                AddressCheck.NOT_OURS -> {
+                                    it.copy(
+                                        error =
+                                            "The device says this address is not one of its own. Do not use it: " +
+                                                "this account may not belong to the board you connected."
+                                    )
+                                }
+
+                                AddressCheck.UNSUPPORTED -> {
+                                    it.copy(
+                                        error =
+                                            "The board's firmware cannot show this address. Update the board " +
+                                                "to check it: zcash.leekwallet.xyz"
+                                    )
+                                }
+                            }
                         }
                     }.onFailure { e ->
                         device.reset()
-                        mutableState.update { it.copy(error = e.message ?: e.toString()) }
+                        mutableState.update { it.copy(error = e.leekMessage()) }
                     }
             }
     }
 
     private fun close() {
+        device.cancel()
         job?.cancel()
         device.reset()
         navigationRouter.back()
     }
+}
+
+/** What Check on board shows: the address and the window brightness. */
+data class LeekCheckAddressState(
+    val address: String,
+    val brightness: LeekQrBrightness,
+)
+
+/**
+ * Check on board (QR, experimental): the Receive screen's unified address as a still QR, for the
+ * board's Main menu > Check address, which says whether it is the board's and at which index. A
+ * one-way display: no link, no pairing, nothing comes back to the phone.
+ */
+class LeekCheckAddressVM(
+    address: String,
+    private val device: LeekWalletDevice,
+    private val navigationRouter: NavigationRouter,
+) : ViewModel() {
+    private val mutableState = MutableStateFlow(LeekCheckAddressState(address, device.qrBrightness))
+    val state: StateFlow<LeekCheckAddressState> = mutableState.asStateFlow()
+
+    fun cycleBrightness() {
+        val next = mutableState.value.brightness.next()
+        device.qrBrightness = next
+        mutableState.update { it.copy(brightness = next) }
+    }
+
+    fun close() = navigationRouter.back()
 }

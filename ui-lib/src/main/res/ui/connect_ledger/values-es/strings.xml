@@ -19,4 +19,6 @@
     <string name="accounts_ledger_shieldedAddress">Dirección protegida de Zcash</string>
     <string name="accounts_ledger_transparentAddress">Dirección transparente de Zcash</string>
 
+    <string name="leekwallet_unsupported_title">No disponible</string>
+    <string name="leekwallet_voting_unsupported_message">La votación no está disponible para una cuenta LeekWallet. La placa firma envíos y shielding, no boletas de gobernanza. Para votar, selecciona una cuenta Zodl.</string>
 </resources>

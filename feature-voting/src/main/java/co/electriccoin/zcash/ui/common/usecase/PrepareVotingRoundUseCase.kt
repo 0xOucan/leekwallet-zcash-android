@@ -5,6 +5,7 @@ import cash.z.ecc.android.sdk.Synchronizer
 import cash.z.ecc.android.sdk.ext.toHex
 import cash.z.ecc.android.sdk.model.BlockHeight
 import cash.z.ecc.android.sdk.model.ZcashNetwork
+import co.electriccoin.zcash.ui.common.model.refuseLeekWalletVoting
 import co.electriccoin.zcash.ui.common.model.requireSpendable
 import co.electriccoin.zcash.ui.common.model.voting.VoteIneligibilityReason
 import co.electriccoin.zcash.ui.common.model.voting.VotingBundleSetupResult
@@ -57,7 +58,7 @@ class PrepareVotingRoundUseCase(
 
     suspend operator fun invoke(roundId: String): VotingRoundPreparationResult =
         withContext(Dispatchers.IO) {
-            getSelectedWalletAccount().requireSpendable()
+            getSelectedWalletAccount().refuseLeekWalletVoting().requireSpendable()
             votingProofPrecomputeRepository.warmProvingCaches()
             val sessionContext = resolveVotingRoundSession(roundId)
             val session = sessionContext.session

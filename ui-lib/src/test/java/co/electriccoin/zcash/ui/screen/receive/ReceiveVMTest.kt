@@ -3,6 +3,8 @@ package co.electriccoin.zcash.ui.screen.receive
 import androidx.compose.ui.graphics.Color
 import cash.z.ecc.android.sdk.model.AccountUuid
 import co.electriccoin.zcash.ui.R
+import co.electriccoin.zcash.ui.common.leekwallet.LeekWalletNavigator
+import co.electriccoin.zcash.ui.common.model.KeystoneAccount
 import co.electriccoin.zcash.ui.common.model.WalletAccount
 import co.electriccoin.zcash.ui.common.model.metadata.MetadataV3
 import co.electriccoin.zcash.ui.common.usecase.AccountIconFixtures
@@ -15,6 +17,7 @@ import co.electriccoin.zcash.ui.design.util.imageRes
 import co.electriccoin.zcash.ui.screen.receive.ReceiveAddressState.ColorMode
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +33,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 /**
  * The receive screen's address rows: a view-only account shows its coloured icon, the view-only
@@ -83,7 +87,40 @@ class ReceiveVMTest {
             assertEquals(ColorMode.ZASHI, items.first().colorMode)
         }
 
-    private fun TestScope.items(account: WalletAccount): List<ReceiveAddressState> {
+    @Test
+    fun aLeekWalletShieldedAddressCanBeVerifiedOverALinkOrCheckedOnTheBoardByQr() =
+        runTest {
+            val account =
+                mockk<KeystoneAccount>(relaxed = true) {
+                    every { isLeekWallet } returns true
+                    every { unifiedAddress } returns LEEK_UA
+                    every { transparentAddress } returns LEEK_T_ADDRESS
+                }
+            val navigator = mockk<LeekWalletNavigator>(relaxed = true)
+
+            val (shielded, transparent) = items(account, navigator)
+
+            assertNotNull(shielded.onVerifyClicked).invoke()
+            verify { navigator.forwardToVerifyAddress(LEEK_UA) }
+            assertNotNull(shielded.onCheckOnBoardClicked).invoke()
+            verify { navigator.forwardToCheckAddressOnBoard(LEEK_UA) }
+            assertNull(transparent.onVerifyClicked)
+            assertNull(transparent.onCheckOnBoardClicked)
+        }
+
+    @Test
+    fun otherAccountsHaveNoBoardCheck() =
+        runTest {
+            items(EditAccountFixtures.zodl()).forEach {
+                assertNull(it.onVerifyClicked)
+                assertNull(it.onCheckOnBoardClicked)
+            }
+        }
+
+    private fun TestScope.items(
+        account: WalletAccount,
+        leekWalletNavigator: LeekWalletNavigator = mockk(relaxed = true),
+    ): List<ReceiveAddressState> {
         val vm =
             ReceiveVM(
                 observeSelectedWalletAccount =
@@ -93,7 +130,7 @@ class ReceiveVMTest {
                 copyToClipboard = mockk(relaxed = true),
                 navigationRouter = mockk(relaxed = true),
                 navigateToRequestZec = mockk(relaxed = true),
-                leekWalletNavigator = mockk(relaxed = true),
+                leekWalletNavigator = leekWalletNavigator,
                 viewOnlyContent =
                     mockk<ViewOnlyContent> {
                         every { receiveShieldedTitle } returns VIEW_ONLY_SHIELDED
@@ -113,3 +150,7 @@ class ReceiveVMTest {
 private val VIEW_ONLY_SHIELDED = StringResource.ByResource(resource = 1, args = emptyList())
 
 private val VIEW_ONLY_TRANSPARENT = StringResource.ByResource(resource = 2, args = emptyList())
+
+private const val LEEK_UA = "utest1leekwalletunifiedaddress"
+
+private const val LEEK_T_ADDRESS = "tmLeekWalletTransparent"

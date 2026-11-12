@@ -10,7 +10,9 @@ import co.electriccoin.zcash.ui.design.util.stringRes
  * instead of reaching signing code that cannot run for it.
  *
  * [Kind.LEDGER]: the operation (voting, migrating, the ephemeral gap-limit flow) is not implemented
- * for a [LedgerAccount] yet. [Kind.VIEW_ONLY]: the account is a [ViewOnlyAccount], which holds no
+ * for a [LedgerAccount] yet. [Kind.LEEKWALLET]: a LeekWallet board does not sign governance ballots,
+ * so voting is refused for a LeekWallet account (it would otherwise enter Keystone's QR flow and
+ * never finish). [Kind.VIEW_ONLY]: the account is a [ViewOnlyAccount], which holds no
  * spend authority at all, so every spend, shield, swap, vote and migration is refused.
  *
  * The error mapping renders it with the copy of its [kind], [errorCopy]; it is never shown as a
@@ -21,16 +23,20 @@ class AccountOperationUnsupportedException(
 ) : Exception(
         when (kind) {
             Kind.LEDGER -> "This action is not available for a Ledger wallet yet."
+            Kind.LEEKWALLET -> "Voting is not available for a LeekWallet account: the board does not sign ballots."
             Kind.VIEW_ONLY -> "This action is not available for a view-only account."
         }
     ) {
     enum class Kind {
         LEDGER,
+        LEEKWALLET,
         VIEW_ONLY
     }
 
     companion object {
         fun ledger() = AccountOperationUnsupportedException(Kind.LEDGER)
+
+        fun leekWallet() = AccountOperationUnsupportedException(Kind.LEEKWALLET)
 
         fun viewOnly() = AccountOperationUnsupportedException(Kind.VIEW_ONLY)
     }
@@ -57,6 +63,13 @@ internal fun AccountOperationUnsupportedException.Kind.errorCopy(viewOnlyContent
             )
         }
 
+        AccountOperationUnsupportedException.Kind.LEEKWALLET -> {
+            UnsupportedOperationCopy(
+                title = stringRes(R.string.leekwallet_unsupported_title),
+                message = stringRes(R.string.leekwallet_voting_unsupported_message),
+            )
+        }
+
         AccountOperationUnsupportedException.Kind.VIEW_ONLY -> {
             UnsupportedOperationCopy(
                 title = viewOnlyContent.unsupportedOperationTitle,
@@ -72,6 +85,17 @@ internal fun AccountOperationUnsupportedException.Kind.errorCopy(viewOnlyContent
 fun <T : WalletAccount> T.requireSpendable(): T {
     if (!isSpendable) {
         throw AccountOperationUnsupportedException.viewOnly()
+    }
+    return this
+}
+
+/**
+ * Throws [AccountOperationUnsupportedException] of [AccountOperationUnsupportedException.Kind.LEEKWALLET]
+ * when this is a LeekWallet account, which cannot vote: the board does not sign governance ballots.
+ */
+fun <T : WalletAccount> T.refuseLeekWalletVoting(): T {
+    if (this is KeystoneAccount && isLeekWallet) {
+        throw AccountOperationUnsupportedException.leekWallet()
     }
     return this
 }

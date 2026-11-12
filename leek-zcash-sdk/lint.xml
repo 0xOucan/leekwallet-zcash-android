@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- The generated bindings use java.lang.ref.Cleaner (API 33) only after
+         Class.forName finds it, and JNA's Cleaner otherwise (UniFFI's
+         UniffiCleaner.create). -->
+    <issue id="NewApi">
+        <ignore path="sdk/kotlin/**" />
+    </issue>
+</lint>

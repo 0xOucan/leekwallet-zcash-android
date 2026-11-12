@@ -10,17 +10,32 @@ import android.hardware.usb.UsbManager
 import androidx.core.content.ContextCompat
 import cash.z.ecc.android.sdk.model.ZcashNetwork
 import cash.z.ecc.sdk.type.fromResources
+import io.leekwallet.zcash.sdk.AccountMeta
+import io.leekwallet.zcash.sdk.AddressCheck
+import io.leekwallet.zcash.sdk.LeekDevice
+import io.leekwallet.zcash.sdk.LinkKind
+import io.leekwallet.zcash.sdk.Network
+import io.leekwallet.zcash.sdk.PairingListener
+import io.leekwallet.zcash.sdk.SignListener
+import io.leekwallet.zcash.sdk.SignProgress
+import io.leekwallet.zcash.sdk.SignerView
+import io.leekwallet.zcash.sdk.applyZsig
+import io.leekwallet.zcash.sdk.boardUpdateText
+import io.leekwallet.zcash.sdk.preflight
+import io.leekwallet.zcash.sdk.prepareForSigner
+import io.leekwallet.zcash.sdk.signerViewBytes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import kotlin.coroutines.resume
 
 /** How the phone reaches the board. */
-enum class LeekTransport(val label: String) {
+enum class LeekTransport(
+    val label: String
+) {
     USB("USB"),
     BLUETOOTH("Bluetooth"),
 
@@ -35,13 +50,17 @@ sealed interface LeekStatus {
     data object Connecting : LeekStatus
 
     /** Compare these six digits with the device, then press ALLOW on it. */
-    data class ComparePasskey(val passkey: String) : LeekStatus
+    data class ComparePasskey(
+        val passkey: String
+    ) : LeekStatus
 
     /** Enter the PIN on the device if it asks. */
     data object Unlock : LeekStatus
 
     /** Working with the device; [what] says on what. */
-    data class Working(val what: String) : LeekStatus
+    data class Working(
+        val what: String
+    ) : LeekStatus
 
     /** The transaction is on the device's screen: review it there. */
     data object ReviewOnDevice : LeekStatus
@@ -56,18 +75,36 @@ sealed interface LeekStatus {
     data object ShareViewKey : LeekStatus
 }
 
-/** The account a LeekWallet device exports (zGetAccount). */
+/** The account a LeekWallet device exports (zGetAccount, or its View key QR). */
 data class LeekAccountInfo(
     val ufvk: String,
-    val ua: String,
+    val ua: String?,
     val seedFingerprintHex: String,
+    val index: Long,
     val birthday: Long?,
 )
 
+/** The board account that signs: what the SDK checks the PCZT and the board's seed against. */
+class LeekSigner(
+    val seedFingerprint: ByteArray,
+    val index: UInt,
+    val ufvk: String,
+)
+
 /**
- * One USB-OTG session with the board per operation: find it, get permission, pair (the user
- * compares six digits), wait for the PIN, do the operation, close. The protocol itself is
- * [LeekDeviceNative].
+ * A QR signing request: [prepared] is the wallet's PCZT with every derivation the board needs,
+ * [sent] the signer view shown to the board. The board's .zsig applies to both.
+ */
+class LeekQrRequest(
+    val prepared: ByteArray,
+    val sent: ByteArray,
+)
+
+/**
+ * One session with the board per operation, through the LeekWallet SDK (LeekDevice): find it
+ * over USB-OTG or Bluetooth LE, pair (the user compares six digits on every connection: no host
+ * is remembered), wait for the PIN, do the operation, close. The links are ours ([UsbSerialIo],
+ * [LeekBleLink]); framing, the encrypted session, preflight and signature checks are the SDK's.
  */
 class LeekWalletDevice(
     private val context: Context,
@@ -84,75 +121,153 @@ class LeekWalletDevice(
     @Volatile
     private var fwCompat: Int? = null
 
+    /** The running session's device, for [cancel]. */
+    @Volatile
+    private var current: LeekDevice? = null
+
+    @Volatile
+    private var cancelRequested = false
+
     private val prefs = context.getSharedPreferences("leekwallet_device", Context.MODE_PRIVATE)
 
     /** The link to use, remembered between sessions. */
     var transport: LeekTransport
-        get() = runCatching { LeekTransport.valueOf(prefs.getString(KEY_TRANSPORT, null)!!) }.getOrDefault(LeekTransport.USB)
+        get() =
+            runCatching { LeekTransport.valueOf(prefs.getString(KEY_TRANSPORT, null)!!) }
+                .getOrDefault(LeekTransport.USB)
         set(value) = prefs.edit().putString(KEY_TRANSPORT, value.name).apply()
 
-    /** Send the device the compact signer view (half the bytes). Off = the full view, as before. */
+    /** Send the device the compact signer view (half the bytes). Off = the full view. */
     var compactPczt: Boolean
         get() = prefs.getBoolean(KEY_COMPACT, true)
         set(value) = prefs.edit().putBoolean(KEY_COMPACT, value).apply()
 
-    /** What goes to the device for [pczt]: its compact view, or [pczt] itself. */
-    fun signerBytes(pczt: ByteArray): ByteArray = if (compactPczt) PcztSignatures.compact(pczt) else pczt
+    /** The QR speed preset, remembered between sessions. */
+    var qrPreset: LeekQrPreset
+        get() = LeekQrPreset.byName(prefs.getString(KEY_QR_PRESET, null))
+        set(value) = prefs.edit().putString(KEY_QR_PRESET, value.name).apply()
 
-    val networkName: String
-        get() = if (ZcashNetwork.fromResources(context) == ZcashNetwork.Testnet) "test" else "main"
+    /** The window brightness while a code is shown to the board, remembered between sessions. */
+    var qrBrightness: LeekQrBrightness
+        get() = LeekQrBrightness.byName(prefs.getString(KEY_QR_BRIGHTNESS, null))
+        set(value) = prefs.edit().putString(KEY_QR_BRIGHTNESS, value.name).apply()
+
+    private val view: SignerView
+        get() = if (compactPczt) SignerView.COMPACT else SignerView.FULL
+
+    val network: Network
+        get() = if (ZcashNetwork.fromResources(context) == ZcashNetwork.Testnet) Network.TEST else Network.MAIN
 
     /** Account 0 of the device: what the app imports as a watch-only, device-signed account. */
     suspend fun readAccount(): LeekAccountInfo =
-        session { h ->
+        session { d ->
             mutableStatus.value = viewKeyStatus(fwCompat)
-            val json = JSONObject(LeekDeviceNative.getAccount(h, ACCOUNT, networkName))
+            val a = d.getAccount(ACCOUNT, network)
             LeekAccountInfo(
-                ufvk = json.getString("ufvk"),
-                ua = json.getString("ua"),
-                seedFingerprintHex = json.getString("seedFingerprint"),
-                birthday = if (json.has("birthday")) json.getLong("birthday") else null,
+                ufvk = a.ufvk,
+                ua = a.ua,
+                seedFingerprintHex = a.seedFingerprint.toHex(),
+                index = a.index.toLong(),
+                birthday = a.birthday?.toLong(),
             )
         }
 
     /**
-     * Sends [pczt] (the signer view, compacted if [compactPczt]) to the device, waits for the
-     * user's review, and returns [pczt] with the device's signatures applied - what the SDK
-     * combines with the proven one.
+     * Signs [pczt] (the wallet's redacted signer PCZT) with the board: preflight, upload of the
+     * signer view, the user's review on the device, every signature verified and applied. Returns
+     * [pczt] with the signatures, what the Keystone pipeline combines with the proven one.
      */
-    suspend fun sign(pczt: ByteArray): ByteArray {
-        val sent = signerBytes(pczt)
-        return session { h ->
-            mutableStatus.value = LeekStatus.ReviewOnDevice
-            val zsig = LeekDeviceNative.sign(h, sent, ACCOUNT, networkName)
-            mutableStatus.value = LeekStatus.Working("Applying the signatures")
-            PcztSignatures.applyTo(pczt, sent, zsig)
+    suspend fun sign(
+        pczt: ByteArray,
+        signer: LeekSigner
+    ): ByteArray =
+        session { d ->
+            val prepared = prepareForSigner(pczt, signer.ufvk, signer.seedFingerprint, signer.index)
+            d.signPczt(prepared, signer.meta(network), view, true, signListener).signedPczt
         }
-    }
 
     /**
-     * zShowAddress: the device shows its address and the user confirms it there. Fails unless the
-     * device confirmed exactly [ua].
+     * QR: checks [pczt] for [signer] as the board will, and returns what to show it. Nothing goes
+     * over a link; the board's ur:leek-zsig reply goes to [applyQrSignature].
      */
-    suspend fun verifyAddress(ua: String) =
-        session { h ->
+    fun qrRequest(
+        pczt: ByteArray,
+        signer: LeekSigner
+    ): LeekQrRequest {
+        val prepared = prepareForSigner(pczt, signer.ufvk, signer.seedFingerprint, signer.index)
+        preflight(prepared, signer.meta(network), null)
+        return LeekQrRequest(prepared, signerViewBytes(prepared, view))
+    }
+
+    /** The PCZT of [request] with the board's [zsig] applied, every signature verified. */
+    fun applyQrSignature(
+        request: LeekQrRequest,
+        zsig: ByteArray
+    ): ByteArray = applyZsig(request.prepared, request.sent, zsig)
+
+    /** zShowAddress: the device shows its address and the user answers there. */
+    suspend fun verifyAddress(
+        ua: String,
+        index: UInt
+    ): AddressCheck =
+        session { d ->
             mutableStatus.value = LeekStatus.CompareAddress
-            LeekDeviceNative.showAddress(h, ACCOUNT, networkName, ua)
+            d.showAddress(index, network, ua)
         }
+
+    /** Stops the running session (any thread); its call ends with the SDK's "cancelled". */
+    fun cancel() {
+        cancelRequested = true
+        current?.cancel()
+    }
 
     fun reset() {
         mutableStatus.value = LeekStatus.Idle
         mutableBoardUpdate.value = null
     }
 
-    private suspend fun <T> session(block: (Long) -> T): T =
+    /** Listeners run on the device thread: they only post state, and never throw. */
+    private val pairingListener =
+        object : PairingListener {
+            override fun onPairingCode(code: String) {
+                mutableStatus.value = LeekStatus.ComparePasskey(code)
+            }
+        }
+
+    private val signListener =
+        object : SignListener {
+            override fun onProgress(progress: SignProgress) {
+                mutableStatus.value =
+                    when (progress) {
+                        SignProgress.Checking -> {
+                            LeekStatus.Working("Checking the transaction")
+                        }
+
+                        is SignProgress.Uploading -> {
+                            val pct = if (progress.total == 0uL) 0uL else progress.sent * 100uL / progress.total
+                            LeekStatus.Working("Sending it to the device ($pct %)")
+                        }
+
+                        SignProgress.ReviewOnDevice -> {
+                            LeekStatus.ReviewOnDevice
+                        }
+
+                        SignProgress.Applying -> {
+                            LeekStatus.Working("Checking and applying the signatures")
+                        }
+                    }
+            }
+        }
+
+    private suspend fun <T> session(block: (LeekDevice) -> T): T =
         withContext(Dispatchers.IO) {
+            cancelRequested = false
             mutableStatus.value = LeekStatus.Connecting
             mutableBoardUpdate.value = null
             fwCompat = null
             if (transport == LeekTransport.BLUETOOTH) {
                 LeekBleLink.scanAndConnect(context).use { link ->
-                    return@withContext run(LeekDeviceNative.openBle(link), block)
+                    return@withContext run(LeekDevice(link, LinkKind.FRAMES), block)
                 }
             }
             val manager = context.getSystemService(UsbManager::class.java)
@@ -162,31 +277,34 @@ class LeekWalletDevice(
             if (!manager.hasPermission(device)) {
                 check(requestPermission(manager, device)) { "USB permission was not granted." }
             }
-            UsbSerialIo.open(manager, device).use { io -> run(LeekDeviceNative.open(io), block) }
+            UsbSerialIo.open(manager, device).use { io -> run(LeekDevice(io, LinkKind.STREAM), block) }
         }
 
-    /** Pair, wait for the PIN, run [block], close: the same on every link. */
+    /** Pair (afresh, every time), wait for the PIN, run [block], close: the same on every link. */
     private fun <T> run(
-        handle: Long,
-        block: (Long) -> T
-    ): T {
-        try {
-            LeekDeviceNative.pair(handle) { mutableStatus.value = LeekStatus.ComparePasskey(it) }
-            mutableStatus.value = LeekStatus.Unlock
-            LeekDeviceNative.ensureUnlocked(handle)
-            readBoardStatus(handle)
-            return block(handle)
-        } finally {
-            LeekDeviceNative.close(handle)
+        device: LeekDevice,
+        block: (LeekDevice) -> T
+    ): T =
+        device.use { d ->
+            current = d
+            try {
+                if (cancelRequested) d.cancel()
+                d.pair(pairingListener)
+                mutableStatus.value = LeekStatus.Unlock
+                d.ensureUnlocked()
+                readBoardStatus(d)
+                block(d)
+            } finally {
+                current = null
+            }
         }
-    }
 
     /** A suggestion only: when the level cannot be read, the operation still goes ahead. */
-    private fun readBoardStatus(handle: Long) {
-        val level = runCatching { LeekDeviceNative.fwCompat(handle) }.getOrNull() ?: return
-        fwCompat = level
-        if (LeekDeviceNative.firmwareOutdated(level)) {
-            mutableBoardUpdate.value = boardUpdateNotice(LeekDeviceNative.boardUpdateText())
+    private fun readBoardStatus(device: LeekDevice) {
+        val features = runCatching { device.getFeatures() }.getOrNull() ?: return
+        fwCompat = features.fwCompat?.toInt() ?: 1
+        if (features.firmwareOutdated) {
+            mutableBoardUpdate.value = boardUpdateNotice(boardUpdateText())
         }
     }
 
@@ -220,9 +338,15 @@ class LeekWalletDevice(
         }
 
     companion object {
-        private const val ACCOUNT = 0
+        private const val ACCOUNT = 0u
         private const val KEY_TRANSPORT = "transport"
         private const val KEY_COMPACT = "compact_pczt"
+        private const val KEY_QR_PRESET = "qr_preset"
+        private const val KEY_QR_BRIGHTNESS = "qr_brightness"
         private const val ACTION_USB_PERMISSION = "io.leekwallet.zcash.USB_PERMISSION"
     }
 }
+
+private fun LeekSigner.meta(network: Network) = AccountMeta(seedFingerprint, index, network, ufvk)
+
+internal fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }

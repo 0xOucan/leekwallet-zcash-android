@@ -17,5 +17,5 @@ internal fun viewKeyStatus(fwCompat: Int?): LeekStatus =
         LeekStatus.Working("Reading the account")
     }
 
-/** The suggestion for a board that [LeekDeviceNative.firmwareOutdated] says is old. Not a block. */
+/** The suggestion for a board whose Features.firmwareOutdated is true. Not a block. */
 internal fun boardUpdateNotice(updateText: String): String = "$updateText How to update: zcash.leekwallet.xyz"

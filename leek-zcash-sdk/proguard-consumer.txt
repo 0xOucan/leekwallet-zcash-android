@@ -1,0 +1,2 @@
+# The SDK's own rules (JNA, the UniFFI bindings and their callback interfaces)
+# come from sdk/consumer-rules.pro, which build-ffi.sh copies from the SDK.

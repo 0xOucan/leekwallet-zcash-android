@@ -1,7 +1,6 @@
 package io.leekwallet.zcash.hw
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -17,39 +16,62 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import com.google.zxing.qrcode.encoder.Encoder
 
 /**
- * A QR code for the board's camera to read: as large as the screen allows, the way the LeekWallet
- * companion draws its eth-sign-request (min(96 % of the width, 70 % of the height)): the board's
- * camera is fixed-focus and low-resolution, so every pixel per module counts. Error correction L,
- * the least modules for the text; whole pixels per module; a four-module quiet zone; black on
- * white. The wallet's ZashiQr (correction M, a framed card) suits a phone reading an address.
+ * A QR code for the board's camera, as docs/zcash/QR-BENCH.md says a phone should show it: on
+ * the black page, as large as the window allows (the board's camera is fixed-focus and
+ * low-resolution, so every pixel per module counts), with a 2-module white border. Error
+ * correction L, the text in the alphanumeric mode (the SDK's frames are uppercase), whole
+ * pixels per module. [longest] is the longest frame of the loop: the QR version is chosen once
+ * for it, so the code keeps one size while it animates.
  */
 @Composable
-fun LeekBigQr(text: String) {
+fun LeekBigQr(
+    text: String,
+    longest: Int
+) {
     val config = LocalConfiguration.current
-    val side = min((config.screenWidthDp * 0.96f).dp, (config.screenHeightDp * 0.70f).dp)
+    val side = min((config.screenWidthDp - SIDE_MARGIN_DP).dp, (config.screenHeightDp * HEIGHT_SHARE).dp)
+    val version = remember(longest) { versionFor(longest) }
     val matrix =
-        remember(text) {
-            Encoder.encode(text, ErrorCorrectionLevel.L, mapOf(EncodeHintType.CHARACTER_SET to "ISO-8859-1")).matrix
+        remember(text, version) {
+            val hints =
+                buildMap<EncodeHintType, Any> {
+                    put(EncodeHintType.CHARACTER_SET, "ISO-8859-1")
+                    if (version != null) put(EncodeHintType.QR_VERSION, version)
+                }
+            runCatching { Encoder.encode(text, ErrorCorrectionLevel.L, hints) }
+                .getOrElse { Encoder.encode(text, ErrorCorrectionLevel.L) }
+                .matrix
         }
-    BoxWithConstraints {
-        Canvas(Modifier.size(side)) {
-            val modules = matrix.width + QUIET * 2
-            val px = kotlin.math.floor(size.minDimension / modules)
-            val origin = (size.minDimension - px * modules) / 2
-            drawRect(Color.White, Offset(origin, origin), Size(px * modules, px * modules))
-            for (y in 0 until matrix.height) {
-                for (x in 0 until matrix.width) {
-                    if (matrix.get(x, y).toInt() == 1) {
-                        drawRect(
-                            Color.Black,
-                            Offset(origin + (x + QUIET) * px, origin + (y + QUIET) * px),
-                            Size(px, px)
-                        )
-                    }
+    Canvas(Modifier.size(side)) {
+        val modules = matrix.width + BORDER * 2
+        val px = kotlin.math.floor(size.minDimension / modules)
+        val origin = (size.minDimension - px * modules) / 2
+        drawRect(Color.White, Offset(origin, origin), Size(px * modules, px * modules))
+        for (y in 0 until matrix.height) {
+            for (x in 0 until matrix.width) {
+                if (matrix.get(x, y).toInt() == 1) {
+                    drawRect(
+                        Color.Black,
+                        Offset(origin + (x + BORDER) * px, origin + (y + BORDER) * px),
+                        Size(px, px)
+                    )
                 }
             }
         }
     }
 }
 
-private const val QUIET = 4
+/** The QR version an alphanumeric text of [length] characters needs at correction L. */
+private fun versionFor(length: Int): Int? {
+    if (length <= 0) return null
+    return runCatching {
+        Encoder.encode("A".repeat(length), ErrorCorrectionLevel.L).version.versionNumber
+    }.getOrNull()
+}
+
+/** White modules round the code, on the black page. */
+private const val BORDER = 2
+
+/** Room left beside the code, and the share of the height it may take (the rest: tip and buttons). */
+private const val SIDE_MARGIN_DP = 8
+private const val HEIGHT_SHARE = 0.62f

@@ -13,6 +13,7 @@ import cash.z.ecc.android.sdk.model.voting.VotingRoundRunReport
 import co.electriccoin.zcash.ui.common.model.AccountOperationUnsupportedException
 import co.electriccoin.zcash.ui.common.model.KeystoneAccount
 import co.electriccoin.zcash.ui.common.model.LedgerAccount
+import co.electriccoin.zcash.ui.common.model.refuseLeekWalletVoting
 import co.electriccoin.zcash.ui.common.model.requireSpendable
 import co.electriccoin.zcash.ui.common.model.voting.VotingErrors
 import co.electriccoin.zcash.ui.common.model.voting.VotingRoundPreparationResult
@@ -95,6 +96,7 @@ class SubmitVotesUseCase(
             if (selectedAccount is LedgerAccount) {
                 throw AccountOperationUnsupportedException.ledger()
             }
+            selectedAccount.refuseLeekWalletVoting()
             selectedAccount.requireSpendable()
             val accountUuidString = selectedAccount.sdkAccount.accountUuid.toVotingAccountScopeId()
 

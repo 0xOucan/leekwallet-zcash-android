@@ -6,32 +6,39 @@ import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
+import io.leekwallet.zcash.sdk.FrameTransport
+import io.leekwallet.zcash.sdk.TransportFailure
 
 /**
  * The board's USB Serial/JTAG port as a CDC-ACM device, read and written with bulk transfers on
  * its data interface. No line coding or DTR/RTS is set: on the ESP32-S3 those lines reset the
  * chip, and the protocol does not need them.
+ *
+ * A [FrameTransport] of kind STREAM for the SDK's LeekDevice: raw bytes both ways, the framing is
+ * done in Rust.
  */
 class UsbSerialIo private constructor(
     private val connection: UsbDeviceConnection,
     private val dataInterface: UsbInterface,
     private val inEp: UsbEndpoint,
     private val outEp: UsbEndpoint,
-) : UsbIo, AutoCloseable {
+) : FrameTransport,
+    AutoCloseable {
     private val buffer = ByteArray(inEp.maxPacketSize.coerceAtLeast(64) * 8)
 
-    override fun write(data: ByteArray) {
+    override fun send(bytes: ByteArray) {
         var off = 0
-        while (off < data.size) {
-            val n = connection.bulkTransfer(outEp, data, off, data.size - off, WRITE_TIMEOUT_MS)
-            check(n > 0) { "USB write failed" }
+        while (off < bytes.size) {
+            val n = connection.bulkTransfer(outEp, bytes, off, bytes.size - off, WRITE_TIMEOUT_MS)
+            if (n <= 0) throw TransportFailure.Disconnected()
             off += n
         }
     }
 
-    override fun read(timeoutMs: Int): ByteArray? {
-        val n = connection.bulkTransfer(inEp, buffer, buffer.size, timeoutMs)
-        return if (n > 0) buffer.copyOf(n) else null
+    /** Whatever arrived within [timeoutMs]; empty when nothing did. */
+    override fun recv(timeoutMs: UInt): ByteArray {
+        val n = connection.bulkTransfer(inEp, buffer, buffer.size, timeoutMs.toInt())
+        return if (n > 0) buffer.copyOf(n) else EMPTY
     }
 
     override fun close() {
@@ -41,6 +48,7 @@ class UsbSerialIo private constructor(
 
     companion object {
         private const val WRITE_TIMEOUT_MS = 2000
+        private val EMPTY = ByteArray(0)
 
         /** Espressif's USB vendor ID (the S3's built-in USB Serial/JTAG). */
         const val ESPRESSIF_VID = 0x303A

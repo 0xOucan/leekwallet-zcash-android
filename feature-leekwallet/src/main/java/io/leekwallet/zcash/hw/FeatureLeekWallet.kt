@@ -20,6 +20,8 @@ class LeekWalletNavigatorImpl(
     override fun forwardToSign() = navigationRouter.forward(LeekSignArgs)
 
     override fun forwardToVerifyAddress(ua: String) = navigationRouter.forward(LeekVerifyArgs(ua))
+
+    override fun forwardToCheckAddressOnBoard(address: String) = navigationRouter.forward(LeekCheckAddressArgs(address))
 }
 
 class LeekWalletNavContributorImpl : LeekWalletNavContributor {
@@ -28,6 +30,9 @@ class LeekWalletNavContributorImpl : LeekWalletNavContributor {
             composable<LeekConnectArgs> { LeekConnectScreen() }
             composable<LeekSignArgs> { LeekSignScreen() }
             composable<LeekViewKeyImportArgs> { LeekViewKeyImportScreen() }
+            composable<LeekCheckAddressArgs> { entry ->
+                LeekCheckAddressScreen(entry.toRoute<LeekCheckAddressArgs>().address)
+            }
             composable<LeekVerifyArgs> { entry ->
                 LeekVerifyScreen(entry.toRoute<LeekVerifyArgs>().ua)
             }
@@ -45,4 +50,5 @@ val featureLeekWalletModule =
         viewModelOf(::LeekSignVM)
         viewModelOf(::LeekViewKeyImportVM)
         viewModel { (ua: String) -> LeekVerifyVM(ua, get(), get(), get()) }
+        viewModel { (address: String) -> LeekCheckAddressVM(address, get(), get()) }
     }

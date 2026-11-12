@@ -267,6 +267,8 @@ class LeekSignVM(
                 onScanSignature = ::onScanSignature,
                 qrPreset = device.qrPreset,
                 onQrPreset = ::setQrPreset,
+                qrBrightness = device.qrBrightness,
+                onQrBrightness = ::cycleQrBrightness,
                 onTransport = ::setTransport,
                 compactPczt = device.compactPczt,
                 onCompactPczt = ::toggleCompact,
@@ -298,10 +300,28 @@ class LeekSignVM(
         mutableState.update { it.copy(qrPreset = p) }
     }
 
+    private fun cycleQrBrightness() {
+        val next = mutableState.value.qrBrightness.next()
+        device.qrBrightness = next
+        mutableState.update { it.copy(qrBrightness = next) }
+    }
+
     private fun start() {
         device.cancel()
         job?.cancel()
-        mutableState.update { it.copy(error = null, idle = false, scanning = false, qrPart = null, qrProgress = null) }
+        scanner?.close()
+        scanner = null
+        qrRequest = null
+        mutableState.update {
+            it.copy(
+                error = null,
+                idle = false,
+                scanning = false,
+                qrPart = null,
+                qrProgress = null,
+                onShowCodeAgain = null
+            )
+        }
         job =
             viewModelScope.launch {
                 runCatching {
@@ -374,7 +394,22 @@ class LeekSignVM(
     private fun onScanSignature() {
         scanner?.close()
         scanner = QrScanner(QrScanKind.ZSIG, null)
-        mutableState.update { it.copy(scanning = true, qrProgress = null) }
+        mutableState.update { it.copy(scanning = true, qrProgress = null, onShowCodeAgain = ::showCodeAgain) }
+    }
+
+    /**
+     * Back from Scan signature (or a signature QR that could not be used) to the same request:
+     * nothing new is built, so the board can scan it again or the user can rescan its reply.
+     */
+    private fun showCodeAgain() {
+        val request = qrRequest ?: return
+        job?.cancel()
+        scanner?.close()
+        scanner = null
+        mutableState.update {
+            it.copy(error = null, scanning = false, qrProgress = null, onShowCodeAgain = null)
+        }
+        job = viewModelScope.launch { showOverQr(request.sent) }
     }
 
     private fun onScanned(text: String) {
@@ -383,12 +418,27 @@ class LeekSignVM(
         when (p.state) {
             QrPartState.COMPLETE -> {
                 val zsig = s.zsig() ?: return
-                mutableState.update { it.copy(scanning = false, qrPart = null, qrProgress = null) }
+                mutableState.update {
+                    it.copy(scanning = false, qrPart = null, qrProgress = null, onShowCodeAgain = null)
+                }
                 job =
                     viewModelScope.launch {
+                        val request = qrRequest
+                        val signed =
+                            runCatching {
+                                checkNotNull(request) { "No transaction is waiting for a signature" }
+                                withContext(Dispatchers.Default) { device.applyQrSignature(request, zsig) }
+                            }.getOrElse { e ->
+                                // Nothing was applied: the same request can be shown again.
+                                mutableState.update {
+                                    it.copy(
+                                        error = e.leekMessage(),
+                                        onShowCodeAgain = if (request != null) ::showCodeAgain else null
+                                    )
+                                }
+                                return@launch
+                            }
                         runCatching {
-                            val request = checkNotNull(qrRequest) { "No transaction is waiting for a signature" }
-                            val signed = withContext(Dispatchers.Default) { device.applyQrSignature(request, zsig) }
                             keystoneProposalRepository.setPcztWithSignatures(Pczt(signed))
                             submitKSProposal()
                         }.onFailure { e -> mutableState.update { it.copy(error = e.leekMessage()) } }
@@ -397,7 +447,12 @@ class LeekSignVM(
 
             QrPartState.REFUSED -> {
                 mutableState.update {
-                    it.copy(scanning = false, qrPart = null, error = p.error ?: "The signature QR could not be used.")
+                    it.copy(
+                        scanning = false,
+                        qrPart = null,
+                        error = p.error ?: "The signature QR could not be used.",
+                        onShowCodeAgain = ::showCodeAgain
+                    )
                 }
             }
 
@@ -498,4 +553,32 @@ class LeekVerifyVM(
         device.reset()
         navigationRouter.back()
     }
+}
+
+/** What Check on board shows: the address and the window brightness. */
+data class LeekCheckAddressState(
+    val address: String,
+    val brightness: LeekQrBrightness,
+)
+
+/**
+ * Check on board (QR, experimental): the Receive screen's unified address as a still QR, for the
+ * board's Main menu > Check address, which says whether it is the board's and at which index. A
+ * one-way display: no link, no pairing, nothing comes back to the phone.
+ */
+class LeekCheckAddressVM(
+    address: String,
+    private val device: LeekWalletDevice,
+    private val navigationRouter: NavigationRouter,
+) : ViewModel() {
+    private val mutableState = MutableStateFlow(LeekCheckAddressState(address, device.qrBrightness))
+    val state: StateFlow<LeekCheckAddressState> = mutableState.asStateFlow()
+
+    fun cycleBrightness() {
+        val next = mutableState.value.brightness.next()
+        device.qrBrightness = next
+        mutableState.update { it.copy(brightness = next) }
+    }
+
+    fun close() = navigationRouter.back()
 }

@@ -115,6 +115,7 @@ class ReceiveVM(
                         stringRes("LeekWallet Transparent Address")
                     }
                 }
+
                 is KeystoneAccount -> {
                     if (type == Unified) {
                         stringRes(R.string.accounts_keystone_shieldedAddress)
@@ -159,6 +160,12 @@ class ReceiveVM(
         onVerifyClicked =
             if (account is KeystoneAccount && account.isLeekWallet && type == Unified) {
                 { leekWalletNavigator.forwardToVerifyAddress(address) }
+            } else {
+                null
+            },
+        onCheckOnBoardClicked =
+            if (account is KeystoneAccount && account.isLeekWallet && type == Unified) {
+                { leekWalletNavigator.forwardToCheckAddressOnBoard(address) }
             } else {
                 null
             },

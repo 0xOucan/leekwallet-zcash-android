@@ -147,6 +147,11 @@ class LeekWalletDevice(
         get() = LeekQrPreset.byName(prefs.getString(KEY_QR_PRESET, null))
         set(value) = prefs.edit().putString(KEY_QR_PRESET, value.name).apply()
 
+    /** The window brightness while a code is shown to the board, remembered between sessions. */
+    var qrBrightness: LeekQrBrightness
+        get() = LeekQrBrightness.byName(prefs.getString(KEY_QR_BRIGHTNESS, null))
+        set(value) = prefs.edit().putString(KEY_QR_BRIGHTNESS, value.name).apply()
+
     private val view: SignerView
         get() = if (compactPczt) SignerView.COMPACT else SignerView.FULL
 
@@ -337,6 +342,7 @@ class LeekWalletDevice(
         private const val KEY_TRANSPORT = "transport"
         private const val KEY_COMPACT = "compact_pczt"
         private const val KEY_QR_PRESET = "qr_preset"
+        private const val KEY_QR_BRIGHTNESS = "qr_brightness"
         private const val ACTION_USB_PERMISSION = "io.leekwallet.zcash.USB_PERMISSION"
     }
 }

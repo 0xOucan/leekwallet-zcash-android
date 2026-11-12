@@ -24,6 +24,12 @@ interface LeekWalletNavigator {
 
     /** Asks the device to show its address, so the user checks [ua] against it there. */
     fun forwardToVerifyAddress(ua: String)
+
+    /**
+     * Shows [address] as a QR for the board's Check address (experimental): no cable, the board
+     * says whether it is its own and at which index.
+     */
+    fun forwardToCheckAddressOnBoard(address: String)
 }
 
 /** Installs the LeekWallet destinations into the wallet nav graph. */

@@ -25,6 +25,8 @@ data class ReceiveAddressState(
     val onRequestClicked: () -> Unit,
     /** Hardware wallets that can show the address: verify it on the device. Null hides it. */
     val onVerifyClicked: (() -> Unit)? = null,
+    /** A LeekWallet account: show the address as a QR for the board's Check address. Null hides it. */
+    val onCheckOnBoardClicked: (() -> Unit)? = null,
 ) {
     enum class ColorMode {
         ZASHI,

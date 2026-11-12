@@ -242,60 +242,74 @@ private fun AddressPanel(
 
         AnimatedVisibility(visible = state.isExpanded) {
             androidx.compose.foundation.layout.Column {
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = ZcashTheme.dimens.spacingDefault)
-            ) {
-                if (state.isShielded) {
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = ZcashTheme.dimens.spacingDefault)
+                ) {
+                    if (state.isShielded) {
+                        ReceiveIconButton(
+                            containerColor = buttonColor,
+                            contentColor = buttonTextColor,
+                            iconPainter = painterResource(id = R.drawable.ic_copy_shielded),
+                            onClick = state.onCopyClicked,
+                            text = stringResource(id = R.string.receive_copy),
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        Spacer(modifier = Modifier.width(ZcashTheme.dimens.spacingSmall))
+                    }
+
                     ReceiveIconButton(
                         containerColor = buttonColor,
                         contentColor = buttonTextColor,
-                        iconPainter = painterResource(id = R.drawable.ic_copy_shielded),
-                        onClick = state.onCopyClicked,
-                        text = stringResource(id = R.string.receive_copy),
+                        iconPainter = painterResource(id = R.drawable.ic_qr_code_shielded),
+                        onClick = state.onQrClicked,
+                        text = stringResource(id = R.string.receive_qrCode),
                         modifier = Modifier.weight(1f)
                     )
 
                     Spacer(modifier = Modifier.width(ZcashTheme.dimens.spacingSmall))
+
+                    ReceiveIconButton(
+                        containerColor = buttonColor,
+                        contentColor = buttonTextColor,
+                        iconPainter = painterResource(id = R.drawable.ic_request_shielded),
+                        onClick = state.onRequestClicked,
+                        text = stringResource(id = R.string.receive_request),
+                        modifier = Modifier.weight(1f)
+                    )
                 }
-
-                ReceiveIconButton(
-                    containerColor = buttonColor,
-                    contentColor = buttonTextColor,
-                    iconPainter = painterResource(id = R.drawable.ic_qr_code_shielded),
-                    onClick = state.onQrClicked,
-                    text = stringResource(id = R.string.receive_qrCode),
-                    modifier = Modifier.weight(1f)
-                )
-
-                Spacer(modifier = Modifier.width(ZcashTheme.dimens.spacingSmall))
-
-                ReceiveIconButton(
-                    containerColor = buttonColor,
-                    contentColor = buttonTextColor,
-                    iconPainter = painterResource(id = R.drawable.ic_request_shielded),
-                    onClick = state.onRequestClicked,
-                    text = stringResource(id = R.string.receive_request),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            state.onVerifyClicked?.let { onVerify ->
-                ReceiveIconButton(
-                    containerColor = buttonColor,
-                    contentColor = buttonTextColor,
-                    // Only a LeekWallet account offers this button.
-                    iconPainter = painterResource(id = co.electriccoin.zcash.ui.design.R.drawable.ic_item_leekwallet),
-                    onClick = onVerify,
-                    text = "Verify on device",
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(top = ZcashTheme.dimens.spacingSmall)
-                )
-            }
+                state.onVerifyClicked?.let { onVerify ->
+                    ReceiveIconButton(
+                        containerColor = buttonColor,
+                        contentColor = buttonTextColor,
+                        // Only a LeekWallet account offers this button.
+                        iconPainter = painterResource(id = co.electriccoin.zcash.ui.design.R.drawable.ic_item_leekwallet),
+                        onClick = onVerify,
+                        text = "Verify on device",
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(top = ZcashTheme.dimens.spacingSmall)
+                    )
+                }
+                state.onCheckOnBoardClicked?.let { onCheck ->
+                    ReceiveIconButton(
+                        containerColor = buttonColor,
+                        contentColor = buttonTextColor,
+                        // Only a LeekWallet account offers this button: no cable, the board scans it.
+                        iconPainter = painterResource(id = R.drawable.ic_qr_code_shielded),
+                        onClick = onCheck,
+                        text = "Check on board (QR)",
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(top = ZcashTheme.dimens.spacingSmall)
+                    )
+                }
             }
         }
     }

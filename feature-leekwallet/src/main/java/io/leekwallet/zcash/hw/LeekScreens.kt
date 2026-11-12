@@ -19,6 +19,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,6 +53,15 @@ data class LeekVerifyArgs(
     val ua: String
 )
 
+/**
+ * Check on board (QR, experimental): show [address] as a still QR for the board's Main menu >
+ * Check address. No link: it works without a cable, and nothing comes back to the phone.
+ */
+@Serializable
+data class LeekCheckAddressArgs(
+    val address: String
+)
+
 /** Import a board account from its View key QR (ur:leek-zcash-accounts), with no link. */
 @Serializable
 data object LeekViewKeyImportArgs
@@ -78,6 +88,11 @@ data class LeekScreenState(
     /** QR mode: the speed preset (bytes per fragment, ms per frame). */
     val qrPreset: LeekQrPreset = LeekQrPreset.DEFAULT,
     val onQrPreset: (LeekQrPreset) -> Unit = {},
+    /** QR mode: the window brightness while the code shows, and the button that cycles it. */
+    val qrBrightness: LeekQrBrightness = LeekQrBrightness.DEFAULT,
+    val onQrBrightness: () -> Unit = {},
+    /** QR mode, once Scan signature was pressed: show the same request again; null hides it. */
+    val onShowCodeAgain: (() -> Unit)? = null,
     val onTransport: (LeekTransport) -> Unit = {},
     /** Signing: whether the device gets the compact PCZT, and a toggle; null hides it. */
     val compactPczt: Boolean? = null,
@@ -231,6 +246,14 @@ private fun LeekView(state: LeekScreenState) {
                 )
                 Spacer(Modifier.height(8.dp))
             }
+            if (state.onShowCodeAgain != null && (state.scanning || state.error != null)) {
+                ZashiButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = "Show code again",
+                    onClick = state.onShowCodeAgain,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
             if (state.idle || state.error != null) {
                 ZashiButton(
                     modifier = Modifier.fillMaxWidth(),
@@ -358,12 +381,12 @@ private fun LeekCameraPermission(content: @Composable () -> Unit) {
 
 /**
  * QR mode, showing the PCZT: a black page with the code as large as the window allows, the
- * window at full brightness and kept on while it shows (both restored after), the presets and
- * the phone tip.
+ * window kept on at the chosen brightness while it shows (both restored after), the presets,
+ * the brightness button and the phone tip.
  */
 @Composable
 private fun LeekQrSendView(state: LeekScreenState) {
-    LeekFullBrightness()
+    LeekQrWindow(state.qrBrightness)
     Column(
         modifier =
             Modifier
@@ -404,6 +427,8 @@ private fun LeekQrSendView(state: LeekScreenState) {
             color = Color.LightGray,
         )
         Spacer(Modifier.height(6.dp))
+        ZashiButton(text = state.qrBrightness.label, onClick = state.onQrBrightness)
+        Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ZashiButton(text = "Scan signature", onClick = state.onScanSignature)
             ZashiButton(text = "Cancel", onClick = state.onClose)
@@ -413,20 +438,73 @@ private fun LeekQrSendView(state: LeekScreenState) {
 }
 
 /**
- * While composed: this window at full brightness and kept on, so the board's camera sees a bright,
- * steady code. The previous brightness and keep-on flag come back when it leaves.
+ * Check on board (QR, experimental): [address] as a still code on a black page, white quiet
+ * zone, the same brightness button as QR signing, and what to do on the board.
  */
 @Composable
-private fun LeekFullBrightness() {
+fun LeekCheckAddressScreen(address: String) {
+    val vm =
+        koinViewModel<LeekCheckAddressVM> {
+            org.koin.core.parameter
+                .parametersOf(address)
+        }
+    val state by vm.state.collectAsStateWithLifecycle()
+    BackHandler { vm.close() }
+    LeekQrWindow(state.brightness)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .systemBarsPadding()
+                .padding(horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Check on board (experimental)",
+            style = ZashiTypography.textMd,
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.weight(1f))
+        LeekBigQr(state.address, 0)
+        Spacer(Modifier.weight(1f))
+        Text(
+            text = LEEK_CHECK_ADDRESS_HINT,
+            style = ZashiTypography.textSm,
+            color = Color.White,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = LEEK_CHECK_ADDRESS_TIP,
+            style = ZashiTypography.textXs,
+            color = Color.LightGray,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ZashiButton(text = state.brightness.label, onClick = vm::cycleBrightness)
+            ZashiButton(text = "Done", onClick = vm::close)
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+/**
+ * While composed: this window kept on, at [brightness] (the phone's own brightness for
+ * [LeekQrBrightness.SYSTEM]), so the board's camera sees a steady code. The brightness and the
+ * keep-on flag the window had before come back when it leaves: on a scan, an error, Cancel or Back.
+ */
+@Composable
+private fun LeekQrWindow(brightness: LeekQrBrightness) {
     val context = LocalContext.current
-    DisposableEffect(Unit) {
-        val window = context.findActivity()?.window
+    val window = remember(context) { context.findActivity()?.window }
+    DisposableEffect(window) {
         val before = window?.attributes?.screenBrightness
         val keptOn = window?.attributes?.flags?.and(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0
-        window?.let { w ->
-            w.attributes = w.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_FULL }
-            w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
+        window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         onDispose {
             window?.let { w ->
                 w.attributes =
@@ -434,6 +512,14 @@ private fun LeekFullBrightness() {
                         screenBrightness = before ?: WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
                     }
                 if (!keptOn) w.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }
+    }
+    SideEffect {
+        window?.let { w ->
+            val wanted = brightness.level ?: WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            if (w.attributes.screenBrightness != wanted) {
+                w.attributes = w.attributes.apply { screenBrightness = wanted }
             }
         }
     }

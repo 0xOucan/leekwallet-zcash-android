@@ -1,12 +1,18 @@
 package io.leekwallet.zcash.hw
 
+import android.content.Context
+import android.content.SharedPreferences
 import io.leekwallet.zcash.sdk.LeekException
 import io.leekwallet.zcash.sdk.QrPartState
 import io.leekwallet.zcash.sdk.QrProgress
 import io.leekwallet.zcash.sdk.Recovery
 import io.leekwallet.zcash.sdk.TransportFailure
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -35,9 +41,81 @@ class LeekQrTest {
 
     @Test
     fun theTipNamesEverySetting() {
-        listOf("100 %", "anti-flicker", "DC dimming", "exposure 0", "Big codes", "3x", "30 cm").forEach {
+        listOf(
+            "lower brightness first",
+            "then a higher one",
+            "anti-flicker",
+            "DC dimming",
+            "exposure 0",
+            "Big codes",
+            "3x",
+            "30 cm"
+        ).forEach {
             assertTrue(LEEK_QR_TIP.contains(it), it)
         }
+        assertFalse(LEEK_QR_TIP.contains("100 %"), "the tip no longer asks for full brightness")
+    }
+
+    @Test
+    fun theCheckAddressHintSaysWhatToDoOnTheBoard() {
+        assertEquals(
+            "On the board: Main menu → Check address, then scan this code. The board says whether " +
+                "the address is yours and which index.",
+            LEEK_CHECK_ADDRESS_HINT
+        )
+        listOf("lower brightness first", "anti-flicker", "DC dimming", "3x", "30 cm").forEach {
+            assertTrue(LEEK_CHECK_ADDRESS_TIP.contains(it), it)
+        }
+    }
+
+    @Test
+    fun brightnessDefaultsToTheSystemLevel() {
+        assertEquals(LeekQrBrightness.SYSTEM, LeekQrBrightness.DEFAULT)
+        assertNull(LeekQrBrightness.SYSTEM.level)
+    }
+
+    @Test
+    fun brightnessLevelsAndLabels() {
+        assertEquals(listOf(null, 0.6f, 0.8f, 1f), LeekQrBrightness.entries.map { it.level })
+        assertEquals(
+            listOf("Brightness: system", "Brightness: 60 %", "Brightness: 80 %", "Brightness: 100 %"),
+            LeekQrBrightness.entries.map { it.label }
+        )
+    }
+
+    @Test
+    fun brightnessCyclesBackToSystem() {
+        assertEquals(LeekQrBrightness.P60, LeekQrBrightness.SYSTEM.next())
+        assertEquals(LeekQrBrightness.P80, LeekQrBrightness.P60.next())
+        assertEquals(LeekQrBrightness.P100, LeekQrBrightness.P80.next())
+        assertEquals(LeekQrBrightness.SYSTEM, LeekQrBrightness.P100.next())
+    }
+
+    @Test
+    fun anUnknownStoredBrightnessFallsBackToSystem() {
+        assertEquals(LeekQrBrightness.SYSTEM, LeekQrBrightness.byName(null))
+        assertEquals(LeekQrBrightness.SYSTEM, LeekQrBrightness.byName("FULL"))
+        assertEquals(LeekQrBrightness.P80, LeekQrBrightness.byName("P80"))
+    }
+
+    @Test
+    fun theBrightnessIsRememberedInTheDevicePreferences() {
+        val editor = mockk<SharedPreferences.Editor>(relaxed = true)
+        every { editor.putString(any(), any()) } returns editor
+        val prefs = mockk<SharedPreferences>()
+        every { prefs.edit() } returns editor
+        val context = mockk<Context>()
+        every { context.getSharedPreferences("leekwallet_device", Context.MODE_PRIVATE) } returns prefs
+        val device = LeekWalletDevice(context)
+
+        every { prefs.getString("qr_brightness", null) } returns null
+        assertEquals(LeekQrBrightness.SYSTEM, device.qrBrightness)
+        every { prefs.getString("qr_brightness", null) } returns "P60"
+        assertEquals(LeekQrBrightness.P60, device.qrBrightness)
+
+        device.qrBrightness = LeekQrBrightness.P100
+        verify { editor.putString("qr_brightness", "P100") }
+        verify { editor.apply() }
     }
 
     @Test

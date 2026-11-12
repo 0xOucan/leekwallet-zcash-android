@@ -9,10 +9,10 @@ The phone syncs, builds and proves transactions. The board holds the seed,
 checks each transaction against its own keys, shows you the outputs and memo,
 and signs. Only the signatures come back.
 
-> **Experimental.** Tested on testnet, and on mainnet with small amounts (a
-> shielded send signed on the board). The board is not audited and has no
-> flash encryption or secure boot (no eFuses burned): use testnet, or small
-> amounts only.
+> **Not audited.** Signing over USB, Bluetooth and QR is tested on testnet,
+> and on mainnet with small amounts (a shielded send signed on the board). The
+> board is not audited and has no flash encryption or secure boot (no eFuses
+> burned): use testnet, or small amounts only.
 
 Website: [zcash.leekwallet.xyz](https://zcash.leekwallet.xyz) · Demo:
 [2-minute video](https://www.youtube.com/watch?v=8F6_8AhsnAA) · X:
@@ -25,13 +25,14 @@ Website: [zcash.leekwallet.xyz](https://zcash.leekwallet.xyz) · Demo:
 |---|---|
 | **Connect a LeekWallet** | Pair over USB-OTG or Bluetooth LE; you compare a six-digit code on the phone and the board, on every connection (no host is remembered). The app imports the board's account as watch-only, with its birthday, and syncs it |
 | **Import from the View key QR** | No cable, no radio: on the board, Main menu → View key; the phone's camera reads the animated `ur:leek-zcash-accounts` and imports the account (UFVK, seed fingerprint, account index, birthday). A one-way export, not pairing |
-| **Sign on the board** | Any send from the LeekWallet account goes to the board for review and signature, over **USB**, **Bluetooth**, or **QR** (experimental: animated `ur:leek-pczt` to the board's camera, `ur:leek-zsig` back; presets *Big codes* 25 B / 350 ms, the phone default, 40 B / 350 ms and 50 B / 500 ms; full brightness and screen kept on while the code shows) |
+| **Sign on the board** | Any send from the LeekWallet account goes to the board for review and signature, over **USB**, **Bluetooth**, or **QR** (air-gapped: animated `ur:leek-pczt` to the board's camera, `ur:leek-zsig` back; presets *Big codes* 25 B / 350 ms, the phone default, 40 B / 350 ms and 50 B / 500 ms; a brightness button (system, 60 %, 80 %, 100 %) and the screen kept on while the code shows). All three go through the LeekWallet SDK |
 | **Compact PCZT** | The board gets the compact signer view (~1.4 KB instead of ~2.8 KB): half the QR frames, faster links. A switch on the sign screen falls back to the full view |
 | **Shield on the board** | Transparent funds of the LeekWallet account (its t-address) are shielded like any other send: Zodl's Shield prompt builds the proposal, the board reviews one "From k of n" page per transparent input and "Shield ... into this wallet", and signs the inputs (a version 2 `.zsig`) |
-| **Verify on device** | On the Receive screen, the board checks that the address the phone shows, even a freshly rotated one, is its own, and shows it for you to compare. An address that is not the board's is refused, with a warning that the app may be compromised |
+| **Verify on device** | On the Receive screen, the board checks that the address the phone shows, even a freshly rotated one, is its own, and shows it for you to compare. An address that is not the board's is refused, with a warning that the app may be compromised. With no link, **Check on board (QR)** shows the address as a still QR for the board's Main menu → Check address, which says whether it is its own and at which index |
 | **Mainnet and testnet** | Two apps that install side by side: **LeekWallet Zcash** (`io.leekwallet.zcash.foss`, mainnet) and **LeekWallet Zcash (testnet)** (`io.leekwallet.zcash.testnet.foss`). Each tells the board its network (`main` / `test`), and the board derives keys and addresses for it |
 | **The LeekWallet SDK** | Pairing, the encrypted session, preflight checks, signing, signature checks and the QR codes come from the [LeekWallet SDK](https://github.com/0xOucan/leekwallet-zcash/tree/main/host/leek-zcash-ffi) (`leek-zcash-ffi`, Kotlin bindings over JNA); the app keeps only its USB and Bluetooth links |
 | **No voting** | The board does not sign governance ballots, so coinholder voting is refused for a LeekWallet account (select a Zodl account to vote) |
+| **QR is never pairing** | The QR codes carry a transaction, its signatures, an address to check or the View key export. Pairing (the six-digit code and the encrypted session) needs USB or Bluetooth |
 | **64-bit phones only** | Android 64-bit (arm64-v8a) phones. The SDK's native library is built for 64-bit only, so release APKs leave out 32-bit (armeabi-v7a) |
 | **Branding** | App name LeekWallet Zcash, package `io.leekwallet.zcash` (`.foss` in the released FOSS build), its own icons and file-provider authorities (so it installs next to Zodl) |
 
@@ -52,10 +53,13 @@ takes about 28 frames per send; use it when that isolation matters.
 3. Send as usual from the LeekWallet account. On the sign screen pick the
    link, press Start, review every page on the board and ACCEPT. Over QR,
    the board scans the phone (3x zoom, about 30 cm away), then the phone
-   scans the board's signature (Scan signature). On an OLED phone turn on
-   anti-flicker / DC dimming, keep the board's exposure at 0 and use Big codes.
+   scans the board's signature (Scan signature). If the board finds the code
+   but doesn't read it, try a lower brightness with the brightness button
+   first, then a higher one. On an OLED phone turn on anti-flicker / DC
+   dimming, keep the board's exposure at 0 and use Big codes.
 4. Receive → LeekWallet Shielded Address → **Verify on device** to check the
-   address on the board's screen.
+   address on the board's screen, or **Check on board (QR)** with no link
+   (on the board: Main menu → Check address, then scan the code).
 5. Funds on the LeekWallet transparent address show as transparent balance.
    Press **Shield** (on Home, or in the balance details): the LeekWallet sign
    screen opens; pick the link, press Start, check each "From" page (your
@@ -145,6 +149,7 @@ Branches: `leekwallet` is the app (default branch); `main` mirrors Zodl's
 - [x] Shield transparent funds, signed on the board
 - [x] Mainnet app beside the testnet one
 - [x] On the LeekWallet SDK; import from the board's View key QR
+- [x] QR signing and Check on board (QR) out of experimental (tested on testnet from this app and Zingo)
 - [ ] A small mainnet send and shield over each link (ROADMAP 10.3)
 - [ ] NEAR Intents swaps signed on the board (needs mainnet support on the board)
 - [ ] A proper `LeekWalletAccount` type instead of the Keystone-shaped one

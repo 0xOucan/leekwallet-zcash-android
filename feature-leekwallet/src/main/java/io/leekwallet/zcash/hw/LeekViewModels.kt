@@ -562,7 +562,7 @@ data class LeekCheckAddressState(
 )
 
 /**
- * Check on board (QR, experimental): the Receive screen's unified address as a still QR, for the
+ * Check on board (QR): the Receive screen's unified address as a still QR, for the
  * board's Main menu > Check address, which says whether it is the board's and at which index. A
  * one-way display: no link, no pairing, nothing comes back to the phone.
  */

@@ -72,8 +72,11 @@ const val LEEK_QR_TIP =
         "higher one. OLED phone: turn on anti-flicker/DC dimming. Board exposure 0, Big codes, " +
         "board at 3x about 30 cm away."
 
+/** The title of the Check on board (QR) page. */
+const val LEEK_CHECK_ADDRESS_TITLE = "Check on board"
+
 /**
- * Shown beside the address code of Check on board (experimental).
+ * Shown beside the address code of Check on board (QR).
  *
  * TODO(leekwallet-sdk): take this from the SDK's address-check hint once it has one.
  */

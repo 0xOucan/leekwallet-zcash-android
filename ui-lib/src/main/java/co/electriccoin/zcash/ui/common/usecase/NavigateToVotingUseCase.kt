@@ -33,6 +33,10 @@ class NavigateToVotingUseCase(
             )
             return
         }
+        if (selectedAccount is KeystoneAccount && selectedAccount.isLeekWallet) {
+            navigateToError(ErrorArgs.General(AccountOperationUnsupportedException.leekWallet()))
+            return
+        }
         if (!selectedAccount.isSpendable) {
             navigateToError(
                 ErrorArgs.General(

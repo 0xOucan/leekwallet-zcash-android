@@ -26,7 +26,7 @@ interface LeekWalletNavigator {
     fun forwardToVerifyAddress(ua: String)
 
     /**
-     * Shows [address] as a QR for the board's Check address (experimental): no cable, the board
+     * Shows [address] as a QR for the board's Check address: no cable, the board
      * says whether it is its own and at which index.
      */
     fun forwardToCheckAddressOnBoard(address: String)

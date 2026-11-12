@@ -57,6 +57,14 @@ class LeekQrTest {
     }
 
     @Test
+    fun theQrTextsNoLongerSayExperimental() {
+        assertEquals("Check on board", LEEK_CHECK_ADDRESS_TITLE)
+        listOf(LEEK_CHECK_ADDRESS_TITLE, LEEK_CHECK_ADDRESS_HINT, LEEK_CHECK_ADDRESS_TIP, LEEK_QR_TIP).forEach {
+            assertFalse(it.contains("experimental", ignoreCase = true), it)
+        }
+    }
+
+    @Test
     fun theCheckAddressHintSaysWhatToDoOnTheBoard() {
         assertEquals(
             "On the board: Main menu → Check address, then scan this code. The board says whether " +

@@ -54,7 +54,7 @@ data class LeekVerifyArgs(
 )
 
 /**
- * Check on board (QR, experimental): show [address] as a still QR for the board's Main menu >
+ * Check on board (QR): show [address] as a still QR for the board's Main menu >
  * Check address. No link: it works without a cable, and nothing comes back to the phone.
  */
 @Serializable
@@ -438,7 +438,7 @@ private fun LeekQrSendView(state: LeekScreenState) {
 }
 
 /**
- * Check on board (QR, experimental): [address] as a still code on a black page, white quiet
+ * Check on board (QR): [address] as a still code on a black page, white quiet
  * zone, the same brightness button as QR signing, and what to do on the board.
  */
 @Composable
@@ -462,7 +462,7 @@ fun LeekCheckAddressScreen(address: String) {
     ) {
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Check on board (experimental)",
+            text = LEEK_CHECK_ADDRESS_TITLE,
             style = ZashiTypography.textMd,
             color = Color.White,
             fontWeight = FontWeight.SemiBold,

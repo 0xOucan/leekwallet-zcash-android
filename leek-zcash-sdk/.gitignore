@@ -1,0 +1,3 @@
+build/
+# Built by tools/leekwallet/build-ffi.sh from the main repo's host/leek-zcash-ffi.
+sdk/

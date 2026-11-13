@@ -19,6 +19,7 @@ tasks {
         exclude("**/build/**")
         exclude("**/.claude/**")
         exclude("**/leek-zcash-sdk/sdk/**")
+        exclude("**/third-party/**")
         config.setFrom(files("${rootProject.projectDir}/tools/detekt.yml"))
         baseline.set(File("${rootProject.projectDir}/tools/detekt-baseline.xml"))
         buildUponDefaultConfig = true
@@ -38,5 +39,6 @@ tasks {
         exclude("**/build/**")
         exclude("**/.claude/**")
         exclude("**/leek-zcash-sdk/sdk/**")
+        exclude("**/third-party/**")
     }
 }

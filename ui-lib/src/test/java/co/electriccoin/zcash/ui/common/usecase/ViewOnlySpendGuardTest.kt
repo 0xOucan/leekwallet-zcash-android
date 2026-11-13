@@ -366,8 +366,6 @@ class ViewOnlySpendGuardTest {
             val dataSource =
                 ProposalDataSourceImpl(
                     synchronizerProvider = synchronizerProvider,
-                    lightWalletEndpointProvider = mockk(),
-                    isServerSelectionAutomaticProvider = mockk(),
                     persistableWalletProvider = mockk(),
                 )
 
@@ -385,8 +383,6 @@ class ViewOnlySpendGuardTest {
             val dataSource =
                 ProposalDataSourceImpl(
                     synchronizerProvider = synchronizerProvider,
-                    lightWalletEndpointProvider = mockk(),
-                    isServerSelectionAutomaticProvider = mockk(),
                     persistableWalletProvider = mockk(),
                 )
 

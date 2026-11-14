@@ -2,6 +2,8 @@ package co.electriccoin.zcash.ui.common.usecase
 
 import co.electriccoin.zcash.ui.common.model.AccountOperationUnsupportedException
 import co.electriccoin.zcash.ui.common.model.KeystoneAccount
+import co.electriccoin.zcash.ui.common.provider.VotingRouteProvider
+import co.electriccoin.zcash.ui.common.repository.VotingKeystoneSessionHolder
 import co.electriccoin.zcash.ui.common.repository.VotingProofPrecomputeRepository
 import co.electriccoin.zcash.ui.common.voting.VotingSettingsEntry
 import co.electriccoin.zcash.ui.screen.error.ErrorArgs
@@ -56,6 +58,7 @@ class LeekWalletVotingGuardTest {
     fun preparingARoundIsRefused() =
         runTest {
             val votingProofPrecomputeRepository = mockk<VotingProofPrecomputeRepository>(relaxed = true)
+            val votingRouteProvider = mockk<VotingRouteProvider>(relaxed = true)
             val useCase =
                 PrepareVotingRoundUseCase(
                     resolveVotingRoundSession = mockk(relaxed = true),
@@ -66,12 +69,14 @@ class LeekWalletVotingGuardTest {
                     votingProofPrecomputeRepository = votingProofPrecomputeRepository,
                     synchronizerProvider = mockk(relaxed = true),
                     getSelectedWalletAccount = getSelectedWalletAccount,
+                    votingRouteProvider = votingRouteProvider,
                 )
 
             val thrown = assertFailsWith<AccountOperationUnsupportedException> { useCase("round") }
 
             assertEquals(AccountOperationUnsupportedException.Kind.LEEKWALLET, thrown.kind)
             coVerify(exactly = 0) { votingProofPrecomputeRepository.warmProvingCaches() }
+            coVerify(exactly = 0) { votingRouteProvider.acquire() }
         }
 
     @Test
@@ -79,6 +84,8 @@ class LeekWalletVotingGuardTest {
         runTest {
             val prepareVotingRound = mockk<PrepareVotingRoundUseCase>(relaxed = true)
             val votingProofPrecomputeRepository = mockk<VotingProofPrecomputeRepository>(relaxed = true)
+            val votingKeystoneSessionHolder = mockk<VotingKeystoneSessionHolder>(relaxed = true)
+            val votingRouteProvider = mockk<VotingRouteProvider>(relaxed = true)
             val useCase =
                 SubmitVotesUseCase(
                     resolveVotingRoundSession = mockk(relaxed = true),
@@ -90,8 +97,9 @@ class LeekWalletVotingGuardTest {
                     prepareVotingRound = prepareVotingRound,
                     votingShareTrackingScheduler = mockk(relaxed = true),
                     votingRecoveryRepository = mockk(relaxed = true),
-                    votingKeystoneSessionHolder = mockk(relaxed = true),
+                    votingKeystoneSessionHolder = votingKeystoneSessionHolder,
                     votingProofPrecomputeRepository = votingProofPrecomputeRepository,
+                    votingRouteProvider = votingRouteProvider,
                 )
 
             val thrown =
@@ -102,5 +110,8 @@ class LeekWalletVotingGuardTest {
             assertEquals(AccountOperationUnsupportedException.Kind.LEEKWALLET, thrown.kind)
             coVerify(exactly = 0) { prepareVotingRound(any()) }
             coVerify(exactly = 0) { votingProofPrecomputeRepository.cancelAndAwaitPrecompute(any(), any()) }
+            // Never routed into Keystone's voting pipeline either.
+            coVerify(exactly = 0) { votingRouteProvider.acquire() }
+            coVerify(exactly = 0) { votingKeystoneSessionHolder.runToCompletion(any(), any(), any()) }
         }
 }

@@ -72,6 +72,10 @@ class IntegrationsVM(
                     null
                 }
 
+                selectedAccount is KeystoneAccount && selectedAccount.isLeekWallet -> {
+                    stringRes(R.string.integrations_disabled_info_flexa_leekwallet)
+                }
+
                 selectedAccount is KeystoneAccount -> {
                     stringRes(R.string.integrations_disabled_info_flexa)
                 }

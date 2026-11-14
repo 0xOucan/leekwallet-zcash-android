@@ -5,6 +5,7 @@ import cash.z.ecc.android.sdk.model.AccountUuid
 import cash.z.ecc.android.sdk.model.Zip32AccountIndex
 import co.electriccoin.zcash.ui.NavigationRouter
 import co.electriccoin.zcash.ui.R
+import co.electriccoin.zcash.ui.common.leekwallet.LEEKWALLET_KEY_SOURCE
 import co.electriccoin.zcash.ui.common.model.KeystoneAccount
 import co.electriccoin.zcash.ui.common.model.LedgerAccount
 import co.electriccoin.zcash.ui.common.model.WalletAccount
@@ -76,6 +77,18 @@ class IntegrationsVMTest {
         }
 
     @Test
+    fun aLeekWalletAccountGetsTheLeekWalletWording() =
+        runTest {
+            val vm = vm(leekWallet())
+            collect(vm)
+
+            assertEquals(
+                R.string.integrations_disabled_info_flexa_leekwallet,
+                assertNotNull(vm.state.value?.disabledInfo).resourceId()
+            )
+        }
+
+    @Test
     fun theSoftwareWalletHasNoDisabledNotice() =
         runTest {
             val vm = vm(zashi())
@@ -99,7 +112,7 @@ class IntegrationsVMTest {
     @Test
     fun withoutFlexaAHardwareWalletGetsNoFlexaNotice() =
         runTest {
-            listOf(keystone(), ledger()).forEach { account ->
+            listOf(keystone(), leekWallet(), ledger()).forEach { account ->
                 val vm = vm(account, Status.UNAVAILABLE)
                 collect(vm)
 
@@ -155,6 +168,20 @@ class IntegrationsVMTest {
     private fun keystone() =
         KeystoneAccount(
             sdkAccount = sdkAccount,
+            unifiedAddress = "u",
+            transparentAddress = "t",
+            orchardBalance = null,
+            ironwoodBalance = null,
+            transparentBalance = null,
+            isSelected = true,
+        )
+
+    private fun leekWallet() =
+        KeystoneAccount(
+            sdkAccount =
+                mockk<Account> {
+                    every { keySource } returns LEEKWALLET_KEY_SOURCE
+                },
             unifiedAddress = "u",
             transparentAddress = "t",
             orchardBalance = null,

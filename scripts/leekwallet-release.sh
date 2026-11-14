@@ -3,7 +3,7 @@
 # write SHA256SUMS and BUILDINFO.txt, show the signing certificate, and print
 # (never run) the commands that sign the checksums and publish the release.
 #
-#   scripts/leekwallet-release.sh 3.19.0-leek.1
+#   scripts/leekwallet-release.sh 3.20.0-leek.1
 #
 # Signing (nothing secret lives in this repository). Either export:
 #   LEEK_RELEASE_KEYSTORE           path to the release keystore, outside the repo
@@ -39,7 +39,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 VERSION_NAME="${1:-}"
-[[ -n "$VERSION_NAME" ]] || die "usage: $0 <versionName>, e.g. $0 3.19.0-leek.1"
+[[ -n "$VERSION_NAME" ]] || die "usage: $0 <versionName>, e.g. $0 3.20.0-leek.1"
 [[ "$VERSION_NAME" =~ ^[0-9A-Za-z.+-]+$ ]] || die "versionName has odd characters: $VERSION_NAME"
 
 prop() { sed -n "s/^$1=//p" "$ROOT/gradle.properties" | tail -n 1; }
@@ -85,6 +85,13 @@ if [[ -n "$SNAPSHOTS" ]]; then
   echo "warning: snapshot dependencies; a rebuild later may resolve different code:" >&2
   echo "$SNAPSHOTS" >&2
   [[ "${LEEK_ALLOW_SNAPSHOT:-}" == 1 ]] || die "set LEEK_ALLOW_SNAPSHOT=1 to build anyway"
+fi
+# A timestamped snapshot (8.0.0-20261109.071156-1) always resolves the same
+# files, but the snapshot repository can purge it: rebuilds may fail later.
+PINNED="$(grep -E '^[A-Z0-9_]+_VERSION=.*-[0-9]{8}\.[0-9]{6}-[0-9]+$' gradle.properties || true)"
+if [[ -n "$PINNED" ]]; then
+  echo "note: pinned snapshot dependencies (reproducible until the snapshot repository purges them):" >&2
+  echo "$PINNED" >&2
 fi
 
 # --- signing -----------------------------------------------------------------
@@ -175,7 +182,6 @@ note "gradle ${TASKS[*]}"
 ./gradlew --no-daemon --no-build-cache --no-configuration-cache \
   -PZCASH_VERSION_NAME="$VERSION_NAME" \
   -PZCASH_VERSION_CODE="$VERSION_CODE" \
-  -PZCASH_FLEXA_KEY= -PZCASH_CMC_KEY= \
   -PIS_SIGN_RELEASE_BUILD_WITH_DEBUG_KEY=false \
   -PIS_RELEASE_BUILD_DEBUGGABLE=false \
   "${GRADLE_SIGN_ARGS[@]}" \

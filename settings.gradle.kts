@@ -121,13 +121,20 @@ dependencyResolutionManagement {
             }
         }
         maven("https://central.sonatype.com/repository/maven-snapshots") {
-            mavenContent {
-                snapshotsOnly()
-            }
+            // LeekWallet: ZCASH_SDK_VERSION pins a timestamped ("unique") snapshot such as
+            // 8.0.0-20261109.071156-1, which Gradle's snapshotsOnly() filter does not admit. Only
+            // -SNAPSHOT and timestamped snapshot versions of the SDK groups come from here.
             if (isRepoRestrictionEnabled) {
                 content {
-                    includeGroup("cash.z.ecc.android")
-                    includeGroup("com.zodl.android")
+                    includeVersionByRegex(
+                        "cash\\.z\\.ecc\\.android|com\\.zodl\\.android",
+                        ".*",
+                        ".*-SNAPSHOT|.*-[0-9]{8}\\.[0-9]{6}-[0-9]+"
+                    )
+                }
+            } else {
+                mavenContent {
+                    snapshotsOnly()
                 }
             }
         }

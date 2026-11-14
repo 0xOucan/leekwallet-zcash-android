@@ -40,6 +40,25 @@ Which link to use: **USB or Bluetooth** in a place you trust, for everyday
 use; they take seconds. **QR** keeps the board off every cable and radio but
 takes about 28 frames per send; use it when that isolation matters.
 
+## Zodl base
+
+The fork is on **Zodl 3.20.0** (3807); its version names are Zodl's plus a
+LeekWallet counter (`3.20.0-leek.1`). Everything Zodl 3.20.0 added comes
+with it, with Zodl's defaults:
+
+- **Private servers (OHTTP).** Syncing, the price feed, swaps, voting and
+  Flexa go through Zodl's OHTTP gateways by default; Settings → servers also
+  offers Public and Manual. The LeekWallet account syncs and broadcasts the
+  same way: a transaction signed on the board is broadcast once, to the
+  current server, like Zodl's own.
+- **Zcash Android SDK 8.0.0**, which is not on Maven Central yet. The build
+  pins the exact snapshot Zodl 3.20.0 shipped with, `8.0.0-20261109.071156-1`
+  (in `gradle.properties`, from the `com.zodl.android` group on
+  `central.sonatype.com/repository/maven-snapshots`), so every build gets
+  the same SDK; it moves to `8.0.0` once that is released.
+- **Flexa built from source** (`third-party/flexa`). Flexa pays from a Zodl
+  account only, not from a LeekWallet one.
+
 ## Using it with the board
 
 1. Flash and wire the board: see the main repository's
@@ -140,7 +159,7 @@ hardware support can be offered to Zodl upstream.
 Branches: `leekwallet` is the app (default branch); `main` mirrors Zodl's
 `main`; the remote `upstream` is
 [zodl-inc/zodl-android](https://github.com/zodl-inc/zodl-android), and
-`leekwallet` is rebased on each Zodl release.
+each Zodl release is merged into `leekwallet` (`--no-ff`, history kept).
 
 ## Roadmap
 

@@ -13,7 +13,7 @@ and next to them `SHA256SUMS`, its signature `SHA256SUMS.sig`, the
 `allowed_signers` file to check it with, and `BUILDINFO.txt` (the commits,
 versions and toolchain the APKs were built from).
 
-> **Experimental.** The LeekWallet board is not audited and has no flash
+> **Not audited.** The LeekWallet board is not audited and has no flash
 > encryption or secure boot. Use the testnet app, or small amounts.
 
 ## Which one
@@ -89,8 +89,9 @@ The release is built by [`scripts/leekwallet-release.sh`](scripts/leekwallet-rel
 `BUILDINFO.txt` in the release lists what it used: this repository's commit,
 the commit of the main repository
 ([leekwallet-zcash](https://github.com/0xOucan/leekwallet-zcash)) whose
-`host/leek-android` crate is the native library, the versionCode, the Zcash
-SDK version and the Rust, Java and Gradle versions.
+`host/leek-zcash-ffi` crate is the LeekWallet SDK (native library and Kotlin
+bindings), the versionCode, the Zcash SDK version and the Rust, Java and
+Gradle versions.
 
 ```sh
 git clone https://github.com/0xOucan/leekwallet-zcash.git      # full clone, not --depth
@@ -129,7 +130,14 @@ On top of that:
   paths (`--remap-path-prefix`) and uses the locked `Cargo.lock`, but a
   different Rust version gives different bytes;
 - the commit hash and commit count are compiled in, so the build must come
-  from the exact commit with full history.
+  from the exact commit with full history;
+- from `3.20.0-leek.1` (Zodl 3.20.0) the Zcash Android SDK is the
+  timestamped snapshot `8.0.0-20261109.071156-1`, the one Zodl 3.20.0
+  shipped with (Maven group `com.zodl.android`,
+  <https://central.sonatype.com/repository/maven-snapshots/>), because
+  8.0.0 is not released on Maven Central yet. A pinned snapshot always
+  resolves the same files, but the snapshot repository can delete it, and a
+  rebuild then fails. The fork moves to `8.0.0` once it is released.
 
 So a rebuild may differ from the release. Treat an identical rebuild as a
 strong check, and a different one as a reason to look closer, not as proof
@@ -147,7 +155,7 @@ far as you trust the source.
    ```sh
    export LEEK_RELEASE_KEYSTORE=~/keys/leekwallet-release.jks
    export LEEK_RELEASE_KEY_ALIAS=leekwallet
-   scripts/leekwallet-release.sh 3.19.0-leek.1
+   scripts/leekwallet-release.sh 3.20.0-leek.1
    ```
 
    The passwords are asked for (or read from `LEEK_RELEASE_KEYSTORE_PASSWORD`
@@ -166,8 +174,9 @@ far as you trust the source.
    (`LEEK_CERT_SHA256` defaults to it).
 
 **Versions.** versionName is Zodl's version plus a LeekWallet counter, e.g.
-`3.17.0-leek.1`, `3.17.0-leek.2`, then `3.19.0-leek.1` after merging
-Zodl 3.19.0; the tag is `v<versionName>`. versionCode defaults to the commit
+`3.17.0-leek.1`, `3.17.0-leek.2`, `3.19.0-leek.1` after merging
+Zodl 3.19.0, then `3.20.0-leek.1` after merging Zodl 3.20.0; the tag is
+`v<versionName>`. versionCode defaults to the commit
 count of the built commit (Zodl's own rule); it must grow with every
 release, or phones refuse the update.
 
